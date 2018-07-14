@@ -583,12 +583,17 @@ proc displayFull*(cb: ConsoleBuffer) =
 proc displayDiff*(cb: ConsoleBuffer) =
   var
     buf = ""
-    bufXPos: Natural
-    currXPos: int
+    bufXPos, bufYPos: Natural
+    currXPos = -1
+    currYPos = -1
 
   proc flushBuf() =
     if buf.len > 0:
-      if currXPos != bufXPos:
+      if currYPos != bufYPos:
+        currXPos = bufXPos
+        currYPos = bufYPos
+        setPos(currXPos, currYPos)
+      elif currXPos != bufXPos:
         currXPos = bufXPos
         setXPos(currXPos)
       put buf
@@ -596,9 +601,8 @@ proc displayDiff*(cb: ConsoleBuffer) =
       buf = ""
 
   for y in 0..<cb.height:
-    setPos(0, y)
-    currXPos = 0
     bufXPos = 0
+    bufYPos = y
     for x in 0..<cb.width:
       let c = cb[x,y]
       if c != prevConsoleBuffer[x,y]:
