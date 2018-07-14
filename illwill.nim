@@ -1,70 +1,95 @@
 import os, strformat, terminal, unicode
 
-export terminal
+export terminal.terminalWidth
+export terminal.terminalHeight
+export terminal.terminalSize
+export terminal.hideCursor
+export terminal.showCursor
+export terminal.Style
 
+type
+  ForegroundColor* = enum
+    fgNone = 0,
+    fgBlack = 30,               ## black
+    fgRed,                      ## red
+    fgGreen,                    ## green
+    fgYellow,                   ## yellow
+    fgBlue,                     ## blue
+    fgMagenta,                  ## magenta
+    fgCyan,                     ## cyan
+    fgWhite                     ## white
 
-const keyNone* = -1
+  BackgroundColor* = enum
+    bgNone = 0,
+    bgBlack = 40,               ## black
+    bgRed,                      ## red
+    bgGreen,                    ## green
+    bgYellow,                   ## yellow
+    bgBlue,                     ## blue
+    bgMagenta,                  ## magenta
+    bgCyan,                     ## cyan
+    bgWhite                     ## white
 
-const keyCtrlA* = 1
-const keyCtrlB* = 2
-const keyCtrlD* = 4
-const keyCtrlE* = 5
-const keyCtrlF* = 6
-const keyCtrlG* = 7
-const keyCtrlH* = 8
-const keyCtrlJ* = 10
-const keyCtrlK* = 11
-const keyCtrlL* = 12
-const keyCtrlN* = 14
-const keyCtrlO* = 15
-const keyCtrlP* = 16
-const keyCtrlQ* = 17
-const keyCtrlR* = 18
-const keyCtrlS* = 19
-const keyCtrlT* = 20
-const keyCtrlU* = 21
-const keyCtrlV* = 22
-const keyCtrlW* = 23
-const keyCtrlX* = 24
-const keyCtrlY* = 25
-const keyCtrlZ* = 26
+const
+  keyNone* = -1
 
-const keyCtrlBackslash*    = 28
-const keyCtrlCloseBracket* = 29
+  keyCtrlA* = 1
+  keyCtrlB* = 2
+  keyCtrlD* = 4
+  keyCtrlE* = 5
+  keyCtrlF* = 6
+  keyCtrlG* = 7
+  keyCtrlH* = 8
+  keyCtrlJ* = 10
+  keyCtrlK* = 11
+  keyCtrlL* = 12
+  keyCtrlN* = 14
+  keyCtrlO* = 15
+  keyCtrlP* = 16
+  keyCtrlQ* = 17
+  keyCtrlR* = 18
+  keyCtrlS* = 19
+  keyCtrlT* = 20
+  keyCtrlU* = 21
+  keyCtrlV* = 22
+  keyCtrlW* = 23
+  keyCtrlX* = 24
+  keyCtrlY* = 25
+  keyCtrlZ* = 26
 
-const keyTab*        = 9
-const keyEnter*      = 13
-const keyEscape*     = 27
-const keySpace*      = 32
-const keyBackspace*  = 127
+  keyCtrlBackslash*    = 28
+  keyCtrlCloseBracket* = 29
 
-const keyUp*    = 1001
-const keyDown*  = 1002
-const keyRight* = 1003
-const keyLeft*  = 1004
+  keyTab*        = 9
+  keyEnter*      = 13
+  keyEscape*     = 27
+  keySpace*      = 32
+  keyBackspace*  = 127
 
-const keyHome*       = 1005
-const keyInsert*     = 1006
-const keyDelete*     = 1007
-const keyEnd*        = 1008
-const keyPageUp*     = 1009
-const keyPageDown*   = 1010
+  keyUp*    = 1001
+  keyDown*  = 1002
+  keyRight* = 1003
+  keyLeft*  = 1004
 
-const keyF1*         = 1011
-const keyF2*         = 1012
-const keyF3*         = 1013
-const keyF4*         = 1014
-const keyF5*         = 1015
-const keyF6*         = 1016
-const keyF7*         = 1017
-const keyF8*         = 1018
-const keyF9*         = 1019
-const keyF10*        = 1020
-const keyF11*        = 1021
-const keyF12*        = 1022
+  keyHome*       = 1005
+  keyInsert*     = 1006
+  keyDelete*     = 1007
+  keyEnd*        = 1008
+  keyPageUp*     = 1009
+  keyPageDown*   = 1010
 
-const XTERM_COLOR    = "xterm-color"
-const XTERM_256COLOR = "xterm-256color"
+  keyF1*         = 1011
+  keyF2*         = 1012
+  keyF3*         = 1013
+  keyF4*         = 1014
+  keyF5*         = 1015
+  keyF6*         = 1016
+  keyF7*         = 1017
+  keyF8*         = 1018
+  keyF9*         = 1019
+  keyF10*        = 1020
+  keyF11*        = 1021
+  keyF12*        = 1022
 
 
 when defined(windows):
@@ -73,8 +98,11 @@ when defined(windows):
   proc kbhit(): cint {.importc: "_kbhit", header: "<conio.h>".}
   proc getch(): cint {.importc: "_getch", header: "<conio.h>".}
 
-  proc consoleInit*()   = discard
-  proc consoleDeinit*() = discard
+  proc consoleInit*() =
+    resetAttributes()
+
+  proc consoleDeinit*() =
+    resetAttributes()
 
   proc getKey*(): int =
     var key = keyNone
@@ -179,9 +207,11 @@ else:  # OSX & Linux
 
 
   proc consoleInit*() =
+    resetAttributes()
     nonblock(true)
 
   proc consoleDeinit*() =
+    resetAttributes()
     nonblock(false)
 
   # surely a 100 char buffer is more than enough; the longest
@@ -223,7 +253,6 @@ else:  # OSX & Linux
     # Inspired by
     # https://github.com/mcandre/charm/blob/master/lib/charm.c
     var key = keyNone
-
     if charsRead == 1:
       case keyBuf[0]:
       of   9: key = keyTab
@@ -235,19 +264,15 @@ else:  # OSX & Linux
                                   # we'll ignore them
       else:
         key = keyBuf[0]
-
     else:
       var inputSeq = ""
       for i in 0..<charsRead:
         inputSeq &= char(keyBuf[i])
-
       for k, sequences in keySequences.pairs:
         for s in sequences:
           if s == inputSeq:
             key = k
-
     result = key
-
 
   proc getKey*(): int =
     var i = 0
@@ -257,15 +282,17 @@ else:  # OSX & Linux
         i += 1
       else:
         break
-
     if i == 0:  # nothing read
       result = keyNone
     else:
       result = parseKey(i)
 
-
   template put*(s: string) = stdout.write s
 
+
+const
+  XTERM_COLOR    = "xterm-color"
+  XTERM_256COLOR = "xterm-256color"
 
 proc enterFullscreen*() =
   when defined(posix):
@@ -291,6 +318,8 @@ proc exitFullscreen*() =
   else:
     eraseScreen()
 
+
+# TODO remove, convert?
 type GraphicsChars* = object
   boxHoriz*:     string
   boxHorizUp*:   string
@@ -367,7 +396,7 @@ when defined(posix):
 ]#
 
 type
-  Char* = object
+  ConsoleChar* = object
     ch*: Rune
     fg*: ForegroundColor
     bg*: BackgroundColor
@@ -376,26 +405,26 @@ type
   ConsoleBuffer* = ref object
     width: int
     height: int
-    buf: seq[Char]
+    buf: seq[ConsoleChar]
     currBg: BackgroundColor
     currFg: ForegroundColor
     currStyle: set[Style]
     currX: Natural
     currY: Natural
 
-proc `[]=`*(cb: var ConsoleBuffer, x, y: Natural, ch: Char) =
+proc `[]=`*(cb: var ConsoleBuffer, x, y: Natural, ch: ConsoleChar) =
   if x < cb.width and y < cb.height:
     cb.buf[cb.width * y + x] = ch
 
-proc `[]`*(cb: ConsoleBuffer, x, y: Natural): Char =
+proc `[]`*(cb: ConsoleBuffer, x, y: Natural): ConsoleChar =
   if x < cb.width and y < cb.height:
     result = cb.buf[cb.width * y + x]
 
 proc clear*(cb: var ConsoleBuffer, ch: string = " ") =
   for y in 0..<cb.height:
     for x in 0..<cb.width:
-      var c = Char(ch: ch.runeAt(0), fg: cb.currFg, bg: cb.currBg,
-                   style: cb.currStyle)
+      var c = ConsoleChar(ch: ch.runeAt(0), fg: cb.currFg, bg: cb.currBg,
+                          style: cb.currStyle)
       cb[x,y] = c
 
 proc newConsoleBuffer*(width, height: Natural): ConsoleBuffer =
@@ -436,7 +465,8 @@ proc getStyle*(cb: var ConsoleBuffer): set[Style] =
 proc write*(cb: var ConsoleBuffer, x, y: Natural, s: string) =
   var currX = x
   for ch in runes(s):
-    var c = Char(ch: ch, fg: cb.currFg, bg: cb.currBg, style: cb.currStyle)
+    var c = ConsoleChar(ch: ch, fg: cb.currFg, bg: cb.currBg,
+                        style: cb.currStyle)
     cb[currX, y] = c
     inc(currX)
   cb.currX = currX
@@ -483,118 +513,144 @@ proc getForegroundColor*(cb: var ConsoleBuffer,
 
 
 
-var gPrevConsoleBuffer: ConsoleBuffer
+var
+  prevConsoleBuffer: ConsoleBuffer
+  currBg: BackgroundColor
+  currFg: ForegroundColor
+  currStyle: set[Style]
 
-proc displayAll*(cb: ConsoleBuffer) =
-  var
-    currBg: BackgroundColor
-    currFg: ForegroundColor
-    currStyle: set[Style]
+proc setAttribs(c: ConsoleChar) =
+  if c.bg == bgNone or c.fg == fgNone or c.style == {}:
+    resetAttributes()
+    currBg = c.bg
+    currFg = c.fg
+    currStyle = c.style
+    if c.bg != bgNone:
+      setBackgroundColor(cast[terminal.BackgroundColor](currBg))
+    if c.fg != fgNone:
+      setForegroundColor(cast[terminal.ForegroundColor](currFg))
+    if c.style != c.style:
+      setStyle(currStyle)
+  else:
+    if c.bg != currBg:
+      currBg = c.bg
+      setBackgroundColor(cast[terminal.BackgroundColor](currBg))
+    if c.fg != currFg:
+      currFg = c.fg
+      setForegroundColor(cast[terminal.ForegroundColor](currFg))
+    if c.style != currStyle:
+      currStyle = c.style
+      setStyle(currStyle)
 
-  var strBuf = ""
+template isNimPre0_18_1: bool =
+  NimMajor <= 0 and NimMinor <= 18 and NimPatch <= 0
 
-  proc flushStrBuf =
-    if strBuf.len > 0:
-      put strBuf
-      strBuf = ""
+proc setPos(x, y: Natural) =
+  when isNimPre0_18_1() and defined(posix):
+    setCursorPos(x+1, y+1)
+  else:
+    setCursorPos(x, y)
 
-  resetAttributes()
+proc setXPos(x: Natural) =
+  when isNimPre0_18_1() and defined(posix):
+    setCursorXPos(x+1)
+  else:
+    setCursorXPos(x)
+
+
+proc displayFull*(cb: ConsoleBuffer) =
+  var buf = ""
+
+  proc flushBuf =
+    if buf.len > 0:
+      put buf
+      buf = ""
+
   for y in 0..<cb.height:
-    # TODO Nim 0.18.1: remove +1 hack
-    setCursorPos(0, y+1)
+    setPos(0, y)
     for x in 0..<cb.width:
       let c = cb[x,y]
-#      if c.bg != currBg:
-#        flushStrBuf()
-#        currBg = c.bg
-#        setBackgroundColor(currBg)
-      if c.fg != currFg:
-        flushStrBuf()
-        currFg = c.fg
-        setForegroundColor(currFg)
-      if c.style != currStyle:
-        flushStrBuf()
-        currStyle = c.style
-        setStyle(currStyle)
-      strBuf = strBuf & $cb[x,y].ch
-    flushStrBuf()
+      if c.bg != currBg or c.fg != currFg or c.style != currStyle:
+        flushBuf()
+        setAttribs(c)
+      buf = buf & $c.ch
+    flushBuf()
 
 
 proc displayDiff*(cb: ConsoleBuffer) =
   var
-    currBg: BackgroundColor
-    currFg: ForegroundColor
-    currStyle: set[Style]
-
-  var
     buf = ""
-    x, y, bufx: Natural
+    x, y, currXPos: Natural
 
-  proc flush() =
+  proc flushBuf =
     if buf.len > 0:
-      # TODO Nim 0.18.1: remove +1 hack
-      setCursorXPos(bufx+1)
+      setXPos(currXPos)
       put buf
       buf = ""
 
-  resetAttributes()
   for y in 0..<cb.height:
-    # TODO Nim 0.18.1: remove +1 hack
-    setCursorPos(0, y+1)
-    bufx = 0
+    setPos(0, y)
+    currXPos = 0
     for x in 0..<cb.width:
       let c = cb[x,y]
-      if c != gPrevConsoleBuffer[x,y]:
-        if c.fg != currFg:
-          flush()
-          bufx = x
-          currFg = c.fg
-          setForegroundColor(currFg)
-        if c.style != currStyle:
-          flush()
-          bufx = x
-          currStyle = c.style
-          setStyle(currStyle)
+      if c != prevConsoleBuffer[x,y]:
+        if c.bg != currBg or c.fg != currFg or c.style != currStyle:
+          flushBuf()
+          setAttribs(c)
         buf = buf & $cb[x,y].ch
       else:
-        flush()
-        bufx = x+1
-    flush()
+        flushBuf()
+        currXPos = x+1
+    flushBuf()
 
+
+var doubleBufferingEnabled = true
+
+proc enableDoubleBuffering*() =
+  doubleBufferingEnabled = true
+  prevConsoleBuffer = nil
+
+proc disableDoubleBuffering*() =
+  doubleBufferingEnabled = false
 
 proc display*(cb: ConsoleBuffer) =
-  if gPrevConsoleBuffer == nil:
-    displayAll(cb)
-    gPrevConsoleBuffer = cb
-  else:
-    if cb.width == gPrevConsoleBuffer.width and
-       cb.height == gPrevConsoleBuffer.height:
-      displayDiff(cb)
-      gPrevConsoleBuffer = cb
+  if doubleBufferingEnabled:
+    if prevConsoleBuffer == nil:
+      displayFull(cb)
+      prevConsoleBuffer = cb
     else:
-      displayAll(cb)
-      gPrevConsoleBuffer = cb
-  flushFile(stdout)
+      if cb.width == prevConsoleBuffer.width and
+         cb.height == prevConsoleBuffer.height:
+        displayDiff(cb)
+        prevConsoleBuffer = cb
+      else:
+        displayFull(cb)
+        prevConsoleBuffer = cb
+    flushFile(stdout)
+  else:
+    displayFull(cb)
+    flushFile(stdout)
+
 
 type
-  BoxChar = object
-    horiz:      BoxHoriz
-    vert:       BoxVert
-    horizStyle: LineStyle
-    vertStyle:  LineStyle
+  BoxChar* = object
+    horiz*:      BoxHoriz
+    vert*:       BoxVert
+    horizStyle*: BoxLineStyle
+    vertStyle*:  BoxLineStyle
 
-  BoxHoriz = enum
+  BoxHoriz* = enum
     bhNone, bhHoriz, bhLeft, bhRight
 
-  BoxVert = enum
+  BoxVert* = enum
     bvNone, bvVert, bvUp, bvDown
 
-  LineStyle = enum
+  BoxLineStyle* = enum
     lsSingle, lsDouble
+
 
 proc isEmpty(c: BoxChar): bool =
   result = c.horiz == bhNone and c.vert == bvNone
-
 
 proc toString*(c: BoxChar): string =
   case c.horiz
@@ -727,7 +783,7 @@ proc `[]`*(b: BoxBuffer, x, y: Natural): BoxChar =
     result = b.buf[b.width * y + x]
 
 proc drawHorizLine*(b: var BoxBuffer, x1, x2, y: Natural,
-                    style: LineStyle = lsSingle) =
+                    style: BoxLineStyle = lsSingle) =
   if y < b.height:
     var xStart = x1
     var xEnd = x2
@@ -747,7 +803,7 @@ proc drawHorizLine*(b: var BoxBuffer, x1, x2, y: Natural,
         b.buf[pos] = c
 
 proc drawVertLine*(b: var BoxBuffer, x, y1, y2: Natural,
-                  style: LineStyle = lsSingle) =
+                  style: BoxLineStyle = lsSingle) =
   if x < b.width:
     var yStart = y1
     var yEnd = y2
@@ -773,11 +829,12 @@ proc write*(cb: var ConsoleBuffer, b: BoxBuffer) =
     for x in 0..<width:
       let boxChar = b.buf[y * b.width + x]
       if not boxChar.isEmpty:
-        var c = Char(ch: (boxChar.toString).runeAt(0),
-                     fg: cb.currFg, bg: cb.currBg, style: cb.currStyle)
+        var c = ConsoleChar(ch: (boxChar.toString).runeAt(0),
+                            fg: cb.currFg, bg: cb.currBg, style: cb.currStyle)
         cb[x,y] = c
 
 
+# TODO
 proc cleanExit() {.noconv.} =
   consoleDeinit()
   exitFullscreen()
@@ -787,9 +844,11 @@ proc cleanExit() {.noconv.} =
 
 setControlCHook(cleanExit)
 
-# "•‹«»›←↑→↓↔↕≡▀▄█▌▐■▲►▼◄"
+
 # TODO test code, remove
 when isMainModule:
+  # "•‹«»›←↑→↓↔↕≡▀▄█▌▐■▲►▼◄"
+
   consoleInit()
   enterFullscreen()
   hideCursor()
