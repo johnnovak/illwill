@@ -193,10 +193,15 @@ else:  # OSX & Linux
     discard tcSetAttr(STDIN_FILENO, TCSANOW, ttyState.addr)
 
 
+  template isNimPre0_18_1: bool =
+    NimMajor <= 0 and NimMinor <= 18 and NimPatch <= 0
+
   proc kbhit(): cint =
     var tv: Timeval
-    # TODO Nim 0.18.1: tv.tv_sec = Time(0)
-    tv.tv_sec = 0
+    when isNimPre0_18_1:
+      tv.tv_sec = 0
+    else:
+      tv.tv_sec = Time(0)
     tv.tv_usec = 0
 
     var fds: TFdSet
@@ -432,8 +437,8 @@ proc newConsoleBuffer*(width, height: Natural): ConsoleBuffer =
   cb.width = width
   cb.height = height
   newSeq(cb.buf, width * height)
-  cb.currBg = bgBlack
-  cb.currFg = fgWhite
+  cb.currBg = bgNone
+  cb.currFg = fgNone
   cb.currStyle = {}
   cb.clear()
   result = cb
@@ -525,11 +530,11 @@ proc setAttribs(c: ConsoleChar) =
     currBg = c.bg
     currFg = c.fg
     currStyle = c.style
-    if c.bg != bgNone:
+    if currBg != bgNone:
       setBackgroundColor(cast[terminal.BackgroundColor](currBg))
-    if c.fg != fgNone:
+    if currFg != fgNone:
       setForegroundColor(cast[terminal.ForegroundColor](currFg))
-    if c.style != c.style:
+    if currStyle != {}:
       setStyle(currStyle)
   else:
     if c.bg != currBg:
@@ -541,9 +546,6 @@ proc setAttribs(c: ConsoleChar) =
     if c.style != currStyle:
       currStyle = c.style
       setStyle(currStyle)
-
-template isNimPre0_18_1: bool =
-  NimMajor <= 0 and NimMinor <= 18 and NimPatch <= 0
 
 proc setPos(x, y: Natural) =
   when isNimPre0_18_1() and defined(posix):
@@ -573,14 +575,14 @@ proc displayFull*(cb: ConsoleBuffer) =
       if c.bg != currBg or c.fg != currFg or c.style != currStyle:
         flushBuf()
         setAttribs(c)
-      buf = buf & $c.ch
+      buf &= $c.ch
     flushBuf()
 
 
 proc displayDiff*(cb: ConsoleBuffer) =
   var
     buf = ""
-    x, y, currXPos: Natural
+    currXPos: Natural
 
   proc flushBuf =
     if buf.len > 0:
@@ -596,8 +598,9 @@ proc displayDiff*(cb: ConsoleBuffer) =
       if c != prevConsoleBuffer[x,y]:
         if c.bg != currBg or c.fg != currFg or c.style != currStyle:
           flushBuf()
+          currXPos = x
           setAttribs(c)
-        buf = buf & $cb[x,y].ch
+        buf &= $c.ch
       else:
         flushBuf()
         currXPos = x+1
@@ -868,7 +871,7 @@ when isMainModule:
 
     var cb = newConsoleBuffer(80, 40)
 #    cb.write(x, 0, "yikes!")
-    cb.write(x+0, 1, "1 2")
+#    cb.write(x+0, 1, "1 2")
 #    cb.setForegroundColor(fgRed)
 #    cb.write(x+2, 2, "NOW SOMETHING IN RED")
 #    cb.setStyle({styleBright})
@@ -886,18 +889,26 @@ when isMainModule:
 #    bb.drawVertLine(8, 5, 14, style = lsDouble)
 #    bb.drawVertLine(20, 6, 14, style = lsSingle)
 #    cb.write(bb)
+#    cb.setForegroundColor(fgWhite)
+#    cb.write(x+0, 1, " Songname")
+#    cb.setForegroundColor(fgCyan)
+#    cb.write(x+10, 1, " Man's mind")
 
     cb.display()
 
-    sleep(400)
+    sleep(500)
 
     var cb2 = newConsoleBuffer(80, 40)
 #    cb2.write(x, 0, "yikes!")
-    cb2.write(x+0, 1, "1 N 2")
+#    cb2.write(x+0, 1, "1 N 2")
 #    cb2.setForegroundColor(fgRed)
 #    cb2.write(x+2, 2, "NOW what SOMETHING IN RED")
 #    cb2.setStyle({styleBright})
 #    cb2.write(x+3, 3, "bright red")
+#    cb.setForegroundColor(fgGreen)
+    cb2.write(x+10, 1, "abcd")
+    cb2.setForegroundColor(fgGreen)
+    cb2.write(x+14, 1, "12")
 
     cb2.display()
 
