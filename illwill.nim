@@ -404,7 +404,7 @@ proc newConsoleBuffer*(width, height: Natural): ConsoleBuffer =
   newSeq(cb.buf, width * height)
   cb.currBg = bgBlack
   cb.currFg = fgWhite
-  cb.currStyle = {styleDim}
+  cb.currStyle = {}
   cb.clear()
   result = cb
 
@@ -481,7 +481,10 @@ proc getForegroundColor*(cb: var ConsoleBuffer,
   result = cb[x,y].fg
 
 
-proc display*(cb: ConsoleBuffer) =
+
+var gPrevConsoleBuffer: ConsoleBuffer
+
+proc displayAll*(cb: ConsoleBuffer) =
   var
     currBg: BackgroundColor
     currFg: ForegroundColor
@@ -499,10 +502,10 @@ proc display*(cb: ConsoleBuffer) =
     setCursorPos(0, y)
     for x in 0..<cb.width:
       let c = cb[x,y]
-      if c.bg != currBg:
-        flushStrBuf()
-        currBg = c.bg
-        setBackgroundColor(currBg)
+#      if c.bg != currBg:
+#        flushStrBuf()
+#        currBg = c.bg
+#        setBackgroundColor(currBg)
       if c.fg != currFg:
         flushStrBuf()
         currFg = c.fg
@@ -514,6 +517,59 @@ proc display*(cb: ConsoleBuffer) =
       strBuf = strBuf & $cb[x,y].ch
     flushStrBuf()
 
+
+proc displayDiff*(cb: ConsoleBuffer) =
+  var
+    currBg: BackgroundColor
+    currFg: ForegroundColor
+    currStyle: set[Style]
+
+  var strBuf = ""
+
+  proc flushStrBuf =
+    if strBuf.len > 0:
+      put strBuf
+      strBuf = ""
+
+  if cb.width == gPrevConsoleBuffer.width and
+     cb.height == gPrevConsoleBuffer.height:
+
+    resetAttributes()
+    for y in 0..<cb.height:
+      setCursorPos(0, y)
+      for x in 0..<cb.width:
+        let c = cb[x,y]
+        let cPrev = gPrevConsoleBuffer[x,y]
+        if c != cPrev:
+  #      if c.bg != currBg:
+  #        flushStrBuf()
+  #        currBg = c.bg
+  #        setBackgroundColor(currBg)
+          setCursorPos(x, y)
+          if c.fg != currFg:
+            flushStrBuf()
+            currFg = c.fg
+            setForegroundColor(currFg)
+          if c.style != currStyle:
+            flushStrBuf()
+            currStyle = c.style
+            setStyle(currStyle)
+          strBuf = strBuf & $cb[x,y].ch
+      flushStrBuf()
+
+    gPrevConsoleBuffer = cb
+
+  else:
+    displayAll(cb)
+    gPrevConsoleBuffer = cb
+
+
+proc display*(cb: ConsoleBuffer) =
+  if gPrevConsoleBuffer == nil:
+    gPrevConsoleBuffer = newConsoleBuffer(cb.width, cb.height)
+    displayAll(cb)
+  else:
+    displayDiff(cb)
 
 type
   BoxChar = object
