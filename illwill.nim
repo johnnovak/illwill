@@ -92,6 +92,10 @@ const
   keyF12*        = 1022
 
 
+template isNimPre0_18_1: bool =
+  NimMajor <= 0 and NimMinor <= 18 and NimPatch <= 0
+
+
 when defined(windows):
   import encodings, unicode, winlean
 
@@ -192,9 +196,6 @@ else:  # OSX & Linux
     # set the terminal attributes.
     discard tcSetAttr(STDIN_FILENO, TCSANOW, ttyState.addr)
 
-
-  template isNimPre0_18_1: bool =
-    NimMajor <= 0 and NimMinor <= 18 and NimPatch <= 0
 
   proc kbhit(): cint =
     var tv: Timeval
