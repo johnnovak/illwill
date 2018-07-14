@@ -167,6 +167,7 @@ else:  # OSX & Linux
 
   proc kbhit(): cint =
     var tv: Timeval
+    # TODO Nim 0.18.1: tv.tv_sec = Time(0)
     tv.tv_sec = 0
     tv.tv_usec = 0
 
@@ -499,7 +500,8 @@ proc displayAll*(cb: ConsoleBuffer) =
 
   resetAttributes()
   for y in 0..<cb.height:
-    setCursorPos(0, y)
+    # TODO Nim 0.18.1: remove +1 hack
+    setCursorPos(0, y+1)
     for x in 0..<cb.width:
       let c = cb[x,y]
 #      if c.bg != currBg:
@@ -524,52 +526,55 @@ proc displayDiff*(cb: ConsoleBuffer) =
     currFg: ForegroundColor
     currStyle: set[Style]
 
-  var strBuf = ""
+  var
+    buf = ""
+    x, y, bufx: Natural
 
-  proc flushStrBuf =
-    if strBuf.len > 0:
-      put strBuf
-      strBuf = ""
+  proc flush() =
+    if buf.len > 0:
+      # TODO Nim 0.18.1: remove +1 hack
+      setCursorXPos(bufx+1)
+      put buf
+      buf = ""
 
-  if cb.width == gPrevConsoleBuffer.width and
-     cb.height == gPrevConsoleBuffer.height:
-
-    resetAttributes()
-    for y in 0..<cb.height:
-      setCursorPos(0, y)
-      for x in 0..<cb.width:
-        let c = cb[x,y]
-        let cPrev = gPrevConsoleBuffer[x,y]
-        if c != cPrev:
-  #      if c.bg != currBg:
-  #        flushStrBuf()
-  #        currBg = c.bg
-  #        setBackgroundColor(currBg)
-          setCursorPos(x, y)
-          if c.fg != currFg:
-            flushStrBuf()
-            currFg = c.fg
-            setForegroundColor(currFg)
-          if c.style != currStyle:
-            flushStrBuf()
-            currStyle = c.style
-            setStyle(currStyle)
-          strBuf = strBuf & $cb[x,y].ch
-      flushStrBuf()
-
-    gPrevConsoleBuffer = cb
-
-  else:
-    displayAll(cb)
-    gPrevConsoleBuffer = cb
+  resetAttributes()
+  for y in 0..<cb.height:
+    # TODO Nim 0.18.1: remove +1 hack
+    setCursorPos(0, y+1)
+    bufx = 0
+    for x in 0..<cb.width:
+      let c = cb[x,y]
+      if c != gPrevConsoleBuffer[x,y]:
+        if c.fg != currFg:
+          flush()
+          bufx = x
+          currFg = c.fg
+          setForegroundColor(currFg)
+        if c.style != currStyle:
+          flush()
+          bufx = x
+          currStyle = c.style
+          setStyle(currStyle)
+        buf = buf & $cb[x,y].ch
+      else:
+        flush()
+        bufx = x+1
+    flush()
 
 
 proc display*(cb: ConsoleBuffer) =
   if gPrevConsoleBuffer == nil:
-    gPrevConsoleBuffer = newConsoleBuffer(cb.width, cb.height)
     displayAll(cb)
+    gPrevConsoleBuffer = cb
   else:
-    displayDiff(cb)
+    if cb.width == gPrevConsoleBuffer.width and
+       cb.height == gPrevConsoleBuffer.height:
+      displayDiff(cb)
+      gPrevConsoleBuffer = cb
+    else:
+      displayAll(cb)
+      gPrevConsoleBuffer = cb
+  flushFile(stdout)
 
 type
   BoxChar = object
@@ -803,26 +808,38 @@ when isMainModule:
     else: discard
 
     var cb = newConsoleBuffer(80, 40)
-    cb.write(x, 0, "yikes!")
-    cb.write(x+1, 1, "seems to work")
-    cb.setForegroundColor(fgRed)
-    cb.write(x+2, 2, "NOW SOMETHING IN RED")
-    cb.setStyle({styleBright})
-    cb.write(x+3, 3, "bright red")
-
-    var bb = newBoxBuffer(cb.width, cb.height)
-    bb.drawHorizLine(5, 20, 6)
-    bb.drawHorizLine(5, 20, 9)
-    bb.drawHorizLine(5, 20, 14, style = lsDouble)
-    bb.drawVertLine(3, 6, 14)
-    bb.drawVertLine(5, 6, 14)
-    bb.drawVertLine(8, 5, 14, style = lsDouble)
-    bb.drawVertLine(3, 6, 14)
-    bb.drawVertLine(5, 6, 14)
-    bb.drawVertLine(8, 5, 14, style = lsDouble)
-    bb.drawVertLine(20, 6, 14, style = lsSingle)
-    cb.write(bb)
+#    cb.write(x, 0, "yikes!")
+    cb.write(x+0, 1, "1 2")
+#    cb.setForegroundColor(fgRed)
+#    cb.write(x+2, 2, "NOW SOMETHING IN RED")
+#    cb.setStyle({styleBright})
+#    cb.write(x+3, 3, "bright red")
+#
+#    var bb = newBoxBuffer(cb.width, cb.height)
+#    bb.drawHorizLine(5, 20, 6)
+#    bb.drawHorizLine(5, 20, 9)
+#    bb.drawHorizLine(5, 20, 14, style = lsDouble)
+#    bb.drawVertLine(3, 6, 14)
+#    bb.drawVertLine(5, 6, 14)
+#    bb.drawVertLine(8, 5, 14, style = lsDouble)
+#    bb.drawVertLine(3, 6, 14)
+#    bb.drawVertLine(5, 6, 14)
+#    bb.drawVertLine(8, 5, 14, style = lsDouble)
+#    bb.drawVertLine(20, 6, 14, style = lsSingle)
+#    cb.write(bb)
 
     cb.display()
 
-    sleep(10)
+    sleep(400)
+
+    var cb2 = newConsoleBuffer(80, 40)
+#    cb2.write(x, 0, "yikes!")
+    cb2.write(x+0, 1, "1 N 2")
+#    cb2.setForegroundColor(fgRed)
+#    cb2.write(x+2, 2, "NOW what SOMETHING IN RED")
+#    cb2.setStyle({styleBright})
+#    cb2.write(x+3, 3, "bright red")
+
+    cb2.display()
+
+    sleep(1000)
