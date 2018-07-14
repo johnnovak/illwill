@@ -564,7 +564,7 @@ proc setXPos(x: Natural) =
 proc displayFull*(cb: ConsoleBuffer) =
   var buf = ""
 
-  proc flushBuf =
+  proc flushBuf() =
     if buf.len > 0:
       put buf
       buf = ""
@@ -583,28 +583,33 @@ proc displayFull*(cb: ConsoleBuffer) =
 proc displayDiff*(cb: ConsoleBuffer) =
   var
     buf = ""
-    currXPos: Natural
+    bufXPos: Natural
+    currXPos: int
 
-  proc flushBuf =
+  proc flushBuf() =
     if buf.len > 0:
-      setXPos(currXPos)
+      if currXPos != bufXPos:
+        currXPos = bufXPos
+        setXPos(currXPos)
       put buf
+      inc(currXPos, buf.runeLen)
       buf = ""
 
   for y in 0..<cb.height:
     setPos(0, y)
     currXPos = 0
+    bufXPos = 0
     for x in 0..<cb.width:
       let c = cb[x,y]
       if c != prevConsoleBuffer[x,y]:
         if c.bg != currBg or c.fg != currFg or c.style != currStyle:
           flushBuf()
-          currXPos = x
+          bufXPos = x
           setAttribs(c)
         buf &= $c.ch
       else:
         flushBuf()
-        currXPos = x+1
+        bufXPos = x+1
     flushBuf()
 
 
