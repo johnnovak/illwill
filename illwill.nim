@@ -9,7 +9,7 @@ export terminal.Style
 
 type
   ForegroundColor* = enum
-    fgNone = 0,
+    fgNone = 0,                 ## default
     fgBlack = 30,               ## black
     fgRed,                      ## red
     fgGreen,                    ## green
@@ -20,7 +20,7 @@ type
     fgWhite                     ## white
 
   BackgroundColor* = enum
-    bgNone = 0,
+    bgNone = 0,                 ## default (transparent)
     bgBlack = 40,               ## black
     bgRed,                      ## red
     bgGreen,                    ## green
@@ -166,7 +166,7 @@ when defined(windows):
   var hStdout = getStdHandle(STD_OUTPUT_HANDLE)
   var utf16LEConverter = open(destEncoding = "utf-16", srcEncoding = "UTF-8")
 
-  proc put*(s: string) =
+  proc put(s: string) =
     var us = utf16LEConverter.convert(s)
     var numWritten: DWORD
     discard writeConsole(hStdout, pointer(us[0].addr), DWORD(s.runeLen),
@@ -293,7 +293,7 @@ else:  # OSX & Linux
     else:
       result = parseKey(i)
 
-  template put*(s: string) = stdout.write s
+  template put(s: string) = stdout.write s
 
 
 const
@@ -326,6 +326,7 @@ proc exitFullscreen*() =
 
 
 # TODO remove, convert?
+#[
 type GraphicsChars* = object
   boxHoriz*:     string
   boxHorizUp*:   string
@@ -378,6 +379,7 @@ let gfxCharsAscii* = GraphicsChars(
   mediumShade:  " ",
   lightShade:   " "
 )
+]#
 
 #[
 when defined(posix):
@@ -433,14 +435,17 @@ proc clear*(cb: var ConsoleBuffer, ch: string = " ") =
                           style: cb.currStyle)
       cb[x,y] = c
 
-proc newConsoleBuffer*(width, height: Natural): ConsoleBuffer =
-  var cb = new ConsoleBuffer
+proc initConsoleBuffer(cb: var ConsoleBuffer, width, height: Natural) =
   cb.width = width
   cb.height = height
   newSeq(cb.buf, width * height)
   cb.currBg = bgNone
   cb.currFg = fgNone
   cb.currStyle = {}
+
+proc newConsoleBuffer*(width, height: Natural): ConsoleBuffer =
+  var cb = new ConsoleBuffer
+  cb.initConsoleBuffer(width, height)
   cb.clear()
   result = cb
 
@@ -449,6 +454,20 @@ proc width*(cb: ConsoleBuffer): Natural =
 
 proc height*(cb: ConsoleBuffer): Natural =
   result = cb.height
+
+proc copyFrom*(cb: var ConsoleBuffer, src: ConsoleBuffer) =
+  let
+    w = min(cb.width, src.width)
+    h = min(cb.height, src.height)
+  for y in 0..<h:
+    for x in 0..<w:
+      cb[x,y] = src[x,y]
+
+proc newConsoleBufferFrom*(src: ConsoleBuffer): ConsoleBuffer =
+  var cb = new ConsoleBuffer
+  cb.initConsoleBuffer(src.width, src.height)
+  cb.copyFrom(src)
+  result = cb
 
 proc setBackgroundColor*(cb: var ConsoleBuffer, bg: BackgroundColor) =
   cb.currBg = bg
@@ -480,43 +499,6 @@ proc write*(cb: var ConsoleBuffer, x, y: Natural, s: string) =
 
 proc write*(cb: var ConsoleBuffer, s: string) =
   write(cb, cb.currX, cb.currY, s)
-
-proc setChar*(cb: var ConsoleBuffer, x, y: Natural, ch: string) =
-  var c = cb[x,y]
-  c.ch = ch.runeAt(0)
-  cb[x,y] = c
-
-proc setStyle*(cb: var ConsoleBuffer, x, y: Natural, s: set[Style]) =
-  var c = cb[x,y]
-  c.style = s
-  cb[x,y] = c
-
-proc setBackgroundColor*(cb: var ConsoleBuffer, x, y: Natural,
-                         bg: BackgroundColor) =
-  var c = cb[x,y]
-  c.bg = bg
-  cb[x,y] = c
-
-proc setForegroundColor*(cb: var ConsoleBuffer, x, y: Natural,
-                         fg: ForegroundColor) =
-  var c = cb[x,y]
-  c.fg = fg
-  cb[x,y] = c
-
-proc getChar*(cb: var ConsoleBuffer, x, y: Natural): Rune =
-  result = cb[x,y].ch
-
-proc getStyle*(cb: var ConsoleBuffer, x, y: Natural): set[Style] =
-  result = cb[x,y].style
-
-proc getBackgroundColor*(cb: var ConsoleBuffer,
-                         x, y: Natural): BackgroundColor =
-  result = cb[x,y].bg
-
-proc getForegroundColor*(cb: var ConsoleBuffer,
-                         x, y: Natural): ForegroundColor =
-  result = cb[x,y].fg
-
 
 
 var
@@ -561,7 +543,7 @@ proc setXPos(x: Natural) =
     setCursorXPos(x)
 
 
-proc displayFull*(cb: ConsoleBuffer) =
+proc displayFull(cb: ConsoleBuffer) =
   var buf = ""
 
   proc flushBuf() =
@@ -580,7 +562,7 @@ proc displayFull*(cb: ConsoleBuffer) =
     flushBuf()
 
 
-proc displayDiff*(cb: ConsoleBuffer) =
+proc displayDiff(cb: ConsoleBuffer) =
   var
     buf = ""
     bufXPos, bufYPos: Natural
@@ -619,26 +601,23 @@ proc displayDiff*(cb: ConsoleBuffer) =
 
 var doubleBufferingEnabled = true
 
-proc enableDoubleBuffering*() =
-  doubleBufferingEnabled = true
+proc setDoubleBuffering*(enabled: bool) =
+  doubleBufferingEnabled = enabled
   prevConsoleBuffer = nil
-
-proc disableDoubleBuffering*() =
-  doubleBufferingEnabled = false
 
 proc display*(cb: ConsoleBuffer) =
   if doubleBufferingEnabled:
     if prevConsoleBuffer == nil:
       displayFull(cb)
-      prevConsoleBuffer = cb
+      prevConsoleBuffer = newConsoleBufferFrom(cb)
     else:
       if cb.width == prevConsoleBuffer.width and
          cb.height == prevConsoleBuffer.height:
         displayDiff(cb)
-        prevConsoleBuffer = cb
+        prevConsoleBuffer.copyFrom(cb)
       else:
         displayFull(cb)
-        prevConsoleBuffer = cb
+        prevConsoleBuffer = newConsoleBufferFrom(cb)
     flushFile(stdout)
   else:
     displayFull(cb)
@@ -665,7 +644,7 @@ type
 proc isEmpty(c: BoxChar): bool =
   result = c.horiz == bhNone and c.vert == bvNone
 
-proc toString*(c: BoxChar): string =
+proc toUTF8String*(c: BoxChar): string =
   case c.horiz
   of bhNone:
     case c.vertStyle
@@ -791,7 +770,7 @@ proc `[]=`*(b: var BoxBuffer, x, y: Natural, c: BoxChar) =
   if x < b.width and y < b.height:
     b.buf[b.width * y + x] = c
 
-proc `[]`*(b: BoxBuffer, x, y: Natural): BoxChar =
+proc `[]`*(b: BoxBuffer, x, y: Natural):  BoxChar =
   if x < b.width and y < b.height:
     result = b.buf[b.width * y + x]
 
@@ -842,7 +821,7 @@ proc write*(cb: var ConsoleBuffer, b: BoxBuffer) =
     for x in 0..<width:
       let boxChar = b.buf[y * b.width + x]
       if not boxChar.isEmpty:
-        var c = ConsoleChar(ch: (boxChar.toString).runeAt(0),
+        var c = ConsoleChar(ch: (boxChar.toUTF8String).runeAt(0),
                             fg: cb.currFg, bg: cb.currBg, style: cb.currStyle)
         cb[x,y] = c
 
