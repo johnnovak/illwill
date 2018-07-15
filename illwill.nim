@@ -1,3 +1,13 @@
+## Module documentation *TODO* ``code``
+##
+## Example:
+##
+## .. code-block:: nim
+##
+##   proc error(msg: string) =
+##     styledWriteLine(stderr, fgRed, "Error: ", resetStyle, msg)
+##
+
 import os, strformat, terminal, unicode
 
 export terminal.terminalWidth
@@ -8,88 +18,191 @@ export terminal.showCursor
 export terminal.Style
 
 type
-  ForegroundColor* = enum
-    fgNone = 0,                 ## default
-    fgBlack = 30,               ## black
-    fgRed,                      ## red
-    fgGreen,                    ## green
-    fgYellow,                   ## yellow
-    fgBlue,                     ## blue
-    fgMagenta,                  ## magenta
-    fgCyan,                     ## cyan
-    fgWhite                     ## white
+  ForegroundColor* = enum   ## Foreground colors
+    fgNone = 0,             ## default
+    fgBlack = 30,           ## black
+    fgRed,                  ## red
+    fgGreen,                ## green
+    fgYellow,               ## yellow
+    fgBlue,                 ## blue
+    fgMagenta,              ## magenta
+    fgCyan,                 ## cyan
+    fgWhite                 ## white
 
-  BackgroundColor* = enum
-    bgNone = 0,                 ## default (transparent)
-    bgBlack = 40,               ## black
-    bgRed,                      ## red
-    bgGreen,                    ## green
-    bgYellow,                   ## yellow
-    bgBlue,                     ## blue
-    bgMagenta,                  ## magenta
-    bgCyan,                     ## cyan
-    bgWhite                     ## white
+  BackgroundColor* = enum   ## Background colors
+    bgNone = 0,             ## default (transparent)
+    bgBlack = 40,           ## black
+    bgRed,                  ## red
+    bgGreen,                ## green
+    bgYellow,               ## yellow
+    bgBlue,                 ## blue
+    bgMagenta,              ## magenta
+    bgCyan,                 ## cyan
+    bgWhite                 ## white
 
-const
-  keyNone* = -1
+  Key* {.pure.} = enum
+    None = (-1, "None"),
 
-  keyCtrlA* = 1
-  keyCtrlB* = 2
-  keyCtrlD* = 4
-  keyCtrlE* = 5
-  keyCtrlF* = 6
-  keyCtrlG* = 7
-  keyCtrlH* = 8
-  keyCtrlJ* = 10
-  keyCtrlK* = 11
-  keyCtrlL* = 12
-  keyCtrlN* = 14
-  keyCtrlO* = 15
-  keyCtrlP* = 16
-  keyCtrlQ* = 17
-  keyCtrlR* = 18
-  keyCtrlS* = 19
-  keyCtrlT* = 20
-  keyCtrlU* = 21
-  keyCtrlV* = 22
-  keyCtrlW* = 23
-  keyCtrlX* = 24
-  keyCtrlY* = 25
-  keyCtrlZ* = 26
+    # Special ASCII characters
+    CtrlA  = (1, "CtrlA"),
+    CtrlB  = (2, "CtrlB"),
+    CtrlC  = (3, "CtrlC"),
+    CtrlD  = (4, "CtrlD"),
+    CtrlE  = (5, "CtrlE"),
+    CtrlF  = (6, "CtrlF"),
+    CtrlG  = (7, "CtrlG"),
+    CtrlH  = (8, "CtrlH"),
+    Tab    = (9, "Tab"),     # Ctrl-I
+    CtrlJ  = (10, "CtrlJ"),
+    CtrlK  = (11, "CtrlK"),
+    CtrlL  = (12, "CtrlL"),
+    Enter  = (13, "Enter"),  # Ctrl-M
+    CtrlN  = (14, "CtrlN"),
+    CtrlO  = (15, "CtrlO"),
+    CtrlP  = (16, "CtrlP"),
+    CtrlQ  = (17, "CtrlQ"),
+    CtrlR  = (18, "CtrlR"),
+    CtrlS  = (19, "CtrlS"),
+    CtrlT  = (20, "CtrlT"),
+    CtrlU  = (21, "CtrlU"),
+    CtrlV  = (22, "CtrlV"),
+    CtrlW  = (23, "CtrlW"),
+    CtrlX  = (24, "CtrlX"),
+    CtrlY  = (25, "CtrlY"),
+    CtrlZ  = (26, "CtrlZ"),
+    Escape = (27, "Escape"),
 
-  keyCtrlBackslash*    = 28
-  keyCtrlCloseBracket* = 29
+    CtrlBackslash    = (28, "CtrlBackslash"),
+    CtrlRightBracket = (29, "CtrlRightBracket"),
 
-  keyTab*        = 9
-  keyEnter*      = 13
-  keyEscape*     = 27
-  keySpace*      = 32
-  keyBackspace*  = 127
+    # Printable ASCII characters
+    Space           = (32, "Space"),
+    ExclamationMark = (33, "ExclamationMark"),
+    DoubleQuote     = (34, "DoubleQuote"),
+    Hash            = (35, "Hash"),
+    Dollar          = (36, "Dollar"),
+    Percent         = (37, "Percent"),
+    Ampersand       = (38, "Ampersand"),
+    SingleQuote     = (39, "SingleQuote"),
+    LeftParen       = (40, "LeftParen"),
+    RightParen      = (41, "RightParen"),
+    Asterisk        = (42, "Asterisk"),
+    Plus            = (43, "Plus"),
+    Comma           = (44, "Comma"),
+    Minus           = (45, "Minus"),
+    Dot             = (46, "Dot"),
+    Slash           = (47, "Slash"),
 
-  keyUp*    = 1001
-  keyDown*  = 1002
-  keyRight* = 1003
-  keyLeft*  = 1004
+    Zero  = (48, "Zero"),
+    One   = (49, "One"),
+    Two   = (50, "Two"),
+    Three = (51, "Three"),
+    Four  = (52, "Four"),
+    Five  = (53, "Five"),
+    Six   = (54, "Six"),
+    Seven = (55, "Seven"),
+    Eight = (56, "Eight"),
+    Nine  = (57, "Nine"),
 
-  keyHome*       = 1005
-  keyInsert*     = 1006
-  keyDelete*     = 1007
-  keyEnd*        = 1008
-  keyPageUp*     = 1009
-  keyPageDown*   = 1010
+    Colon        = (58, "Colon"),
+    Semicolon    = (59, "Semicolon"),
+    LessThan     = (60, "LessThan"),
+    Equals       = (61, "Equals"),
+    GreaterThan  = (62, "GreaterThan"),
+    QuestionMark = (63, "QuestionMark"),
+    At           = (64, "At"),
 
-  keyF1*         = 1011
-  keyF2*         = 1012
-  keyF3*         = 1013
-  keyF4*         = 1014
-  keyF5*         = 1015
-  keyF6*         = 1016
-  keyF7*         = 1017
-  keyF8*         = 1018
-  keyF9*         = 1019
-  keyF10*        = 1020
-  keyF11*        = 1021
-  keyF12*        = 1022
+    ShiftA  = (65, "ShiftA"),
+    ShiftB  = (66, "ShiftB"),
+    ShiftC  = (67, "ShiftC"),
+    ShiftD  = (68, "ShiftD"),
+    ShiftE  = (69, "ShiftE"),
+    ShiftF  = (70, "ShiftF"),
+    ShiftG  = (71, "ShiftG"),
+    ShiftH  = (72, "ShiftH"),
+    ShiftI  = (73, "ShiftI"),
+    ShiftJ  = (74, "ShiftJ"),
+    ShiftK  = (75, "ShiftK"),
+    ShiftL  = (76, "ShiftL"),
+    ShiftM  = (77, "ShiftM"),
+    ShiftN  = (78, "ShiftN"),
+    ShiftO  = (79, "ShiftO"),
+    ShiftP  = (80, "ShiftP"),
+    ShiftQ  = (81, "ShiftQ"),
+    ShiftR  = (82, "ShiftR"),
+    ShiftS  = (83, "ShiftS"),
+    ShiftT  = (84, "ShiftT"),
+    ShiftU  = (85, "ShiftU"),
+    ShiftV  = (86, "ShiftV"),
+    ShiftW  = (87, "ShiftW"),
+    ShiftX  = (88, "ShiftX"),
+    ShiftY  = (89, "ShiftY"),
+    ShiftZ  = (90, "ShiftZ"),
+
+    LeftBracket  = (91, "LeftBracket"),
+    Backslash    = (92, "Backslash"),
+    RightBracket = (93, "RightBracket"),
+    Caret        = (94, "Caret"),
+    Underscore   = (95, "Underscore"),
+    GraveAccent  = (96, "GraveAccent"),
+
+    A = (97, "A"),
+    B = (98, "B"),
+    C = (99, "C"),
+    D = (100, "D"),
+    E = (101, "E"),
+    F = (102, "F"),
+    G = (103, "G"),
+    H = (104, "H"),
+    I = (105, "I"),
+    J = (106, "J"),
+    K = (107, "K"),
+    L = (108, "L"),
+    M = (109, "M"),
+    N = (110, "N"),
+    O = (111, "O"),
+    P = (112, "P"),
+    Q = (113, "Q"),
+    R = (114, "R"),
+    S = (115, "S"),
+    T = (116, "T"),
+    U = (117, "U"),
+    V = (118, "V"),
+    W = (119, "W"),
+    X = (120, "X"),
+    Y = (121, "Y"),
+    Z = (122, "Z"),
+
+    LeftBrace  = (123, "LeftBrace"),
+    Pipe       = (124, "Pipe"),
+    RightBrace = (125, "RightBrace"),
+    Tilde      = (126, "Tilde"),
+    Backspace  = (127, "Backspace"),
+
+    # Special characters with virtual keycodes
+    Up       = (1001, "Up"),
+    Down     = (1002, "Down"),
+    Right    = (1003, "Right"),
+    Left     = (1004, "Left"),
+    Home     = (1005, "Home"),
+    Insert   = (1006, "Insert"),
+    Delete   = (1007, "Delete"),
+    End      = (1008, "End"),
+    PageUp   = (1009, "PageUp"),
+    PageDown = (1010, "PageDown"),
+
+    F1  = (1011, "F1"),
+    F2  = (1012, "F2"),
+    F3  = (1013, "F3"),
+    F4  = (1014, "F4"),
+    F5  = (1015, "F5"),
+    F6  = (1016, "F6"),
+    F7  = (1017, "F7"),
+    F8  = (1018, "F8"),
+    F9  = (1019, "F9"),
+    F10 = (1020, "F10"),
+    F11 = (1021, "F11"),
+    F12 = (1022, "F12")
 
 
 template isNimPre0_18_1: bool =
@@ -108,51 +221,55 @@ when defined(windows):
   proc consoleDeinit*() =
     resetAttributes()
 
-  proc getKey*(): int =
-    var key = keyNone
+  proc getKey*(): Key =
+    var key = Key.None
 
     if kbhit() > 0:
       let c = getch()
       case c:
       of   0:
         case getch():
-        of 59: key = keyF1
-        of 60: key = keyF2
-        of 61: key = keyF3
-        of 62: key = keyF4
-        of 63: key = keyF5
-        of 64: key = keyF6
-        of 65: key = keyF7
-        of 66: key = keyF8
-        of 67: key = keyF9
-        of 68: key = keyF10
+        of 59: key = Key.F1
+        of 60: key = Key.F2
+        of 61: key = Key.F3
+        of 62: key = Key.F4
+        of 63: key = Key.F5
+        of 64: key = Key.F6
+        of 65: key = Key.F7
+        of 66: key = Key.F8
+        of 67: key = Key.F9
+        of 68: key = Key.F10
         else: discard getch()  # ignore unknown 2-key keycodes
 
-      of   8: key = keyBackspace
-      of   9: key = keyTab
-      of  13: key = keyEnter
-      of  32: key = keySpace
+      of   8: key = Key.Backspace
+      of   9: key = Key.Tab
+      of  13: key = Key.Enter
+      of  32: key = Key.Space
 
       of 224:
         case getch():
-        of  72: key = keyUp
-        of  75: key = keyLeft
-        of  77: key = keyRight
-        of  80: key = keyDown
+        of  72: key = Key.Up
+        of  75: key = Key.Left
+        of  77: key = Key.Right
+        of  80: key = Key.Down
 
-        of  71: key = keyHome
-        of  82: key = keyInsert
-        of  83: key = keyDelete
-        of  79: key = keyEnd
-        of  73: key = keyPageUp
-        of  81: key = keyPageDown
+        of  71: key = Key.Home
+        of  82: key = Key.Insert
+        of  83: key = Key.Delete
+        of  79: key = Key.End
+        of  73: key = Key.PageUp
+        of  81: key = Key.PageDown
 
-        of 133: key = keyF11
-        of 134: key = keyF12
+        of 133: key = Key.F11
+        of 134: key = Key.F12
         else: discard  # ignore unknown 2-key keycodes
 
       else:
-        key = c
+        try:
+          key = Key(c)
+        except RangeError:
+          # ignore unknown keycodes
+          key = Key.None
 
     result = key
 
@@ -301,6 +418,7 @@ const
   XTERM_256COLOR = "xterm-256color"
 
 proc enterFullscreen*() =
+  ## stuff
   when defined(posix):
     case getEnv("TERM"):
     of XTERM_COLOR:
@@ -428,11 +546,12 @@ proc `[]`*(cb: ConsoleBuffer, x, y: Natural): ConsoleChar =
   if x < cb.width and y < cb.height:
     result = cb.buf[cb.width * y + x]
 
-proc clear*(cb: var ConsoleBuffer, ch: string = " ") =
+proc clear*(cb: var ConsoleBuffer, ch: string = " ",
+            fg: ForegroundColor = fgNone, bg: BackgroundColor = bgNone,
+            style: set[Style] = {}) =
+  let c = ConsoleChar(ch: ch.runeAt(0), fg: fg, bg: bg, style: style)
   for y in 0..<cb.height:
     for x in 0..<cb.width:
-      var c = ConsoleChar(ch: ch.runeAt(0), fg: cb.currFg, bg: cb.currBg,
-                          style: cb.currStyle)
       cb[x,y] = c
 
 proc initConsoleBuffer(cb: var ConsoleBuffer, width, height: Natural) =
@@ -842,21 +961,22 @@ when isMainModule:
   # "•‹«»›←↑→↓↔↕≡▀▄█▌▐■▲►▼◄"
 
   consoleInit()
-  enterFullscreen()
-  hideCursor()
-  resetAttributes()
+#  enterFullscreen()
+#  hideCursor()
+#  resetAttributes()
 
-  var x: Natural = 0
+#  var x: Natural = 0
 
   while true:
-    case getKey()
-    of ord('h'): x = max(0, x-1)
-    of ord('l'): inc(x)
-
-    of keyEscape, ord('q'):
+    var key = getKey()
+    case key
+    of Key.None: discard
+    of Key.Escape, Key.Q:
       cleanExit()
+    else:
+      echo key
 
-    else: discard
+    sleep(20)
 
     var cb = newConsoleBuffer(80, 40)
 #    cb.write(x, 0, "yikes!")
@@ -883,11 +1003,11 @@ when isMainModule:
 #    cb.setForegroundColor(fgCyan)
 #    cb.write(x+10, 1, " Man's mind")
 
-    cb.display()
+#    cb.display()
 
-    sleep(500)
+#    sleep(500)
 
-    var cb2 = newConsoleBuffer(80, 40)
+#    var cb2 = newConsoleBuffer(80, 40)
 #    cb2.write(x, 0, "yikes!")
 #    cb2.write(x+0, 1, "1 N 2")
 #    cb2.setForegroundColor(fgRed)
@@ -895,10 +1015,10 @@ when isMainModule:
 #    cb2.setStyle({styleBright})
 #    cb2.write(x+3, 3, "bright red")
 #    cb.setForegroundColor(fgGreen)
-    cb2.write(x+10, 1, "abcd")
-    cb2.setForegroundColor(fgGreen)
-    cb2.write(x+14, 1, "12")
+#    cb2.write(x+10, 1, "C")
+#    cb2.setForegroundColor(fgGreen)
+#    cb2.write(x+14, 1, "12")
 
-    cb2.display()
+#    cb2.display()
 
-    sleep(1000)
+#    sleep(1000)
