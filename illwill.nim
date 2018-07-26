@@ -205,6 +205,13 @@ type
     F12 = (1022, "F12")
 
 
+proc toKey(c: int): Key =
+  try:
+    result = Key(c)
+  except RangeError:  # ignore unknown keycodes
+    result = Key.None
+
+
 template isNimPre0_18_1: bool =
   NimMajor <= 0 and NimMinor <= 18 and NimPatch <= 0
 
@@ -265,11 +272,7 @@ when defined(windows):
         else: discard  # ignore unknown 2-key keycodes
 
       else:
-        try:
-          key = Key(c)
-        except RangeError:
-          # ignore unknown keycodes
-          key = Key.None
+        key = toKey(c)
 
     result = key
 
@@ -290,7 +293,7 @@ when defined(windows):
                          numWritten.addr, nil)
 
 
-else:  # OSX & Linux
+else:  # OS X & Linux
   import posix, tables, termios
 
   proc nonblock(enabled: bool) =
@@ -346,58 +349,59 @@ else:  # OSX & Linux
 
   let
     keySequences = {
-      keyUp:        @["\eOA", "\e[A"],
-      keyDown:      @["\eOB", "\e[B"],
-      keyRight:     @["\eOC", "\e[C"],
-      keyLeft:      @["\eOD", "\e[D"],
+      ord(Key.Up):        @["\eOA", "\e[A"],
+      ord(Key.Down):      @["\eOB", "\e[B"],
+      ord(Key.Right):     @["\eOC", "\e[C"],
+      ord(Key.Left):      @["\eOD", "\e[D"],
 
-      keyHome:      @["\e[1~", "\e[7~", "\eOH", "\e[H"],
-      keyInsert:    @["\e[2~"],
-      keyDelete:    @["\e[3~"],
-      keyEnd:       @["\e[4~", "\e[8~", "\eOF", "\e[F"],
-      keyPageUp:    @["\e[5~"],
-      keyPageDown:  @["\e[6~"],
+      ord(Key.Home):      @["\e[1~", "\e[7~", "\eOH", "\e[H"],
+      ord(Key.Insert):    @["\e[2~"],
+      ord(Key.Delete):    @["\e[3~"],
+      ord(Key.End):       @["\e[4~", "\e[8~", "\eOF", "\e[F"],
+      ord(Key.PageUp):    @["\e[5~"],
+      ord(Key.PageDown):  @["\e[6~"],
 
-      keyF1:        @["\e[11~", "\eOP"],
-      keyF2:        @["\e[12~", "\eOQ"],
-      keyF3:        @["\e[13~", "\eOR"],
-      keyF4:        @["\e[14~", "\eOS"],
-      keyF5:        @["\e[15~"],
-      keyF6:        @["\e[17~"],
-      keyF7:        @["\e[18~"],
-      keyF8:        @["\e[19~"],
-      keyF9:        @["\e[20~"],
-      keyF10:       @["\e[21~"],
-      keyF11:       @["\e[23~"],
-      keyF12:       @["\e[24~"]
+      ord(Key.F1):        @["\e[11~", "\eOP"],
+      ord(Key.F2):        @["\e[12~", "\eOQ"],
+      ord(Key.F3):        @["\e[13~", "\eOR"],
+      ord(Key.F4):        @["\e[14~", "\eOS"],
+      ord(Key.F5):        @["\e[15~"],
+      ord(Key.F6):        @["\e[17~"],
+      ord(Key.F7):        @["\e[18~"],
+      ord(Key.F8):        @["\e[19~"],
+      ord(Key.F9):        @["\e[20~"],
+      ord(Key.F10):       @["\e[21~"],
+      ord(Key.F11):       @["\e[23~"],
+      ord(Key.F12):       @["\e[24~"]
     }.toTable
 
-  proc parseKey(charsRead: int): int =
+  proc parseKey(charsRead: int): Key =
     # Inspired by
     # https://github.com/mcandre/charm/blob/master/lib/charm.c
-    var key = keyNone
+    var key = Key.None
     if charsRead == 1:
-      case keyBuf[0]:
-      of   9: key = keyTab
-      of  10: key = keyEnter
-      of  27: key = keyEscape
-      of  32: key = keySpace
-      of 127: key = keyBackspace
+      let ch = keyBuf[0]
+      case ch:
+      of   9: key = Key.Tab
+      of  10: key = Key.Enter
+      of  27: key = Key.Escape
+      of  32: key = Key.Space
+      of 127: key = Key.Backspace
       of 0, 29, 30, 31: discard   # these have no Windows equivalents so
                                   # we'll ignore them
       else:
-        key = keyBuf[0]
+        key = toKey(ch)
     else:
       var inputSeq = ""
       for i in 0..<charsRead:
         inputSeq &= char(keyBuf[i])
-      for k, sequences in keySequences.pairs:
+      for keyCode, sequences in keySequences.pairs:
         for s in sequences:
           if s == inputSeq:
-            key = k
+            key = toKey(keyCode)
     result = key
 
-  proc getKey*(): int =
+  proc getKey*(): Key =
     var i = 0
     while kbhit() > 0 and i < KEY_SEQUENCE_MAXLEN:
       var ret = read(0, keyBuf[i].addr, 1)
@@ -406,7 +410,7 @@ else:  # OSX & Linux
       else:
         break
     if i == 0:  # nothing read
-      result = keyNone
+      result = Key.None
     else:
       result = parseKey(i)
 
@@ -882,7 +886,7 @@ when isMainModule:
 
     sleep(20)
 
-    var cb = newConsoleBuffer(80, 40)
+#    var cb = newConsoleBuffer(80, 40)
 #    cb.write(x, 0, "yikes!")
 #    cb.write(x+0, 1, "1 2")
 #    cb.setForegroundColor(fgGreen)
