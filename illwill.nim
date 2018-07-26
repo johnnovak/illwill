@@ -443,9 +443,8 @@ proc exitFullscreen*() =
     eraseScreen()
 
 
-# TODO remove, convert?
 #[
-type GraphicsChars* = object
+type BoxChars* = object
   boxHoriz*:     string
   boxHorizUp*:   string
   boxHorizDown*: string
@@ -462,7 +461,7 @@ type GraphicsChars* = object
   mediumShade*:  string
   lightShade*:   string
 
-let gfxCharsUnicode* = GraphicsChars(
+let boxCharsUnicode* = BoxChars(
   boxHoriz:     "─",
   boxHorizUp:   "┴",
   boxHorizDown: "┬",
@@ -480,7 +479,7 @@ let gfxCharsUnicode* = GraphicsChars(
   lightShade:   "░"
 )
 
-let gfxCharsAscii* = GraphicsChars(
+let boxCharsAscii* = BoxChars(
   boxHoriz:     "-",
   boxHorizUp:   "+",
   boxHorizDown: "+",
@@ -744,135 +743,93 @@ proc display*(cb: ConsoleBuffer) =
 
 
 type
-  BoxChar* = object
-    horiz*:      BoxHoriz
-    vert*:       BoxVert
-    horizStyle*: BoxLineStyle
-    vertStyle*:  BoxLineStyle
+  BoxChar* = int
 
-  BoxHoriz* = enum
-    bhNone, bhHoriz, bhLeft, bhRight
+const
+  LEFT   = 0x01
+  RIGHT  = 0x02
+  UP     = 0x04
+  DOWN   = 0x08
+  H_DBL  = 0x10
+  V_DBL  = 0x20
 
-  BoxVert* = enum
-    bvNone, bvVert, bvUp, bvDown
+  HORIZ = LEFT or RIGHT
+  VERT  = UP or DOWN
 
-  BoxLineStyle* = enum
-    lsSingle, lsDouble
+var gBoxCharsUnicode: array[64, string]
+
+gBoxCharsUnicode[0] = " "
+
+gBoxCharsUnicode[   0 or  0 or     0 or    0] = " "
+gBoxCharsUnicode[   0 or  0 or     0 or LEFT] = "─"
+gBoxCharsUnicode[   0 or  0 or RIGHT or    0] = "─"
+gBoxCharsUnicode[   0 or  0 or RIGHT or LEFT] = "─"
+gBoxCharsUnicode[   0 or UP or     0 or    0] = "│"
+gBoxCharsUnicode[   0 or UP or     0 or LEFT] = "┘"
+gBoxCharsUnicode[   0 or UP or RIGHT or    0] = "└"
+gBoxCharsUnicode[   0 or UP or RIGHT or LEFT] = "┴"
+gBoxCharsUnicode[DOWN or  0 or     0 or    0] = "│"
+gBoxCharsUnicode[DOWN or  0 or     0 or LEFT] = "┐"
+gBoxCharsUnicode[DOWN or  0 or RIGHT or    0] = "┌"
+gBoxCharsUnicode[DOWN or  0 or RIGHT or LEFT] = "┬"
+gBoxCharsUnicode[DOWN or UP or     0 or    0] = "│"
+gBoxCharsUnicode[DOWN or UP or     0 or LEFT] = "┤"
+gBoxCharsUnicode[DOWN or UP or RIGHT or    0] = "├"
+gBoxCharsUnicode[DOWN or UP or RIGHT or LEFT] = "┼"
+
+gBoxCharsUnicode[H_DBL or    0 or  0 or     0 or    0] = " "
+gBoxCharsUnicode[H_DBL or    0 or  0 or     0 or LEFT] = "═"
+gBoxCharsUnicode[H_DBL or    0 or  0 or RIGHT or    0] = "═"
+gBoxCharsUnicode[H_DBL or    0 or  0 or RIGHT or LEFT] = "═"
+gBoxCharsUnicode[H_DBL or    0 or UP or     0 or    0] = "│"
+gBoxCharsUnicode[H_DBL or    0 or UP or     0 or LEFT] = "╛"
+gBoxCharsUnicode[H_DBL or    0 or UP or RIGHT or    0] = "╘"
+gBoxCharsUnicode[H_DBL or    0 or UP or RIGHT or LEFT] = "╧"
+gBoxCharsUnicode[H_DBL or DOWN or  0 or     0 or    0] = "│"
+gBoxCharsUnicode[H_DBL or DOWN or  0 or     0 or LEFT] = "╕"
+gBoxCharsUnicode[H_DBL or DOWN or  0 or RIGHT or    0] = "╒"
+gBoxCharsUnicode[H_DBL or DOWN or  0 or RIGHT or LEFT] = "╤"
+gBoxCharsUnicode[H_DBL or DOWN or UP or     0 or    0] = "│"
+gBoxCharsUnicode[H_DBL or DOWN or UP or     0 or LEFT] = "╡"
+gBoxCharsUnicode[H_DBL or DOWN or UP or RIGHT or    0] = "╞"
+gBoxCharsUnicode[H_DBL or DOWN or UP or RIGHT or LEFT] = "╪"
+
+gBoxCharsUnicode[V_DBL or    0 or  0 or     0 or    0] = " "
+gBoxCharsUnicode[V_DBL or    0 or  0 or     0 or LEFT] = "─"
+gBoxCharsUnicode[V_DBL or    0 or  0 or RIGHT or    0] = "─"
+gBoxCharsUnicode[V_DBL or    0 or  0 or RIGHT or LEFT] = "─"
+gBoxCharsUnicode[V_DBL or    0 or UP or     0 or    0] = "║"
+gBoxCharsUnicode[V_DBL or    0 or UP or     0 or LEFT] = "╜"
+gBoxCharsUnicode[V_DBL or    0 or UP or RIGHT or    0] = "╙"
+gBoxCharsUnicode[V_DBL or    0 or UP or RIGHT or LEFT] = "╨"
+gBoxCharsUnicode[V_DBL or DOWN or  0 or     0 or    0] = "║"
+gBoxCharsUnicode[V_DBL or DOWN or  0 or     0 or LEFT] = "╖"
+gBoxCharsUnicode[V_DBL or DOWN or  0 or RIGHT or    0] = "╓"
+gBoxCharsUnicode[V_DBL or DOWN or  0 or RIGHT or LEFT] = "╥"
+gBoxCharsUnicode[V_DBL or DOWN or UP or     0 or    0] = "║"
+gBoxCharsUnicode[V_DBL or DOWN or UP or     0 or LEFT] = "╢"
+gBoxCharsUnicode[V_DBL or DOWN or UP or RIGHT or    0] = "╟"
+gBoxCharsUnicode[V_DBL or DOWN or UP or RIGHT or LEFT] = "╫"
+
+gBoxCharsUnicode[H_DBL or V_DBL or    0 or  0 or     0 or    0] = " "
+gBoxCharsUnicode[H_DBL or V_DBL or    0 or  0 or     0 or LEFT] = "═"
+gBoxCharsUnicode[H_DBL or V_DBL or    0 or  0 or RIGHT or    0] = "═"
+gBoxCharsUnicode[H_DBL or V_DBL or    0 or  0 or RIGHT or LEFT] = "═"
+gBoxCharsUnicode[H_DBL or V_DBL or    0 or UP or     0 or    0] = "║"
+gBoxCharsUnicode[H_DBL or V_DBL or    0 or UP or     0 or LEFT] = "╝"
+gBoxCharsUnicode[H_DBL or V_DBL or    0 or UP or RIGHT or    0] = "╚"
+gBoxCharsUnicode[H_DBL or V_DBL or    0 or UP or RIGHT or LEFT] = "╩"
+gBoxCharsUnicode[H_DBL or V_DBL or DOWN or  0 or     0 or    0] = "║"
+gBoxCharsUnicode[H_DBL or V_DBL or DOWN or  0 or     0 or LEFT] = "╗"
+gBoxCharsUnicode[H_DBL or V_DBL or DOWN or  0 or RIGHT or    0] = "╔"
+gBoxCharsUnicode[H_DBL or V_DBL or DOWN or  0 or RIGHT or LEFT] = "╦"
+gBoxCharsUnicode[H_DBL or V_DBL or DOWN or UP or     0 or    0] = "║"
+gBoxCharsUnicode[H_DBL or V_DBL or DOWN or UP or     0 or LEFT] = "╣"
+gBoxCharsUnicode[H_DBL or V_DBL or DOWN or UP or RIGHT or    0] = "╠"
+gBoxCharsUnicode[H_DBL or V_DBL or DOWN or UP or RIGHT or LEFT] = "╬"
 
 
-proc isEmpty(c: BoxChar): bool =
-  result = c.horiz == bhNone and c.vert == bvNone
-
-proc toUTF8String*(c: BoxChar): string =
-  case c.horiz
-  of bhNone:
-    case c.vertStyle
-    of lsSingle:
-      case c.vert
-      of bvNone: result = " "
-      of bvVert: result = "│"
-      of bvUp:   result = "│"
-      of bvDown: result = "│"
-    of lsDouble:
-      case c.vert
-      of bvNone: result = " "
-      of bvVert: result = "║"
-      of bvUp:   result = "║"
-      of bvDown: result = "║"
-
-  of bhHoriz:
-    case c.horizStyle
-    of lsSingle:
-      case c.vertStyle
-      of lsSingle:
-        case c.vert
-        of bvNone: result = "─"
-        of bvVert: result = "┼"
-        of bvUp:   result = "┴"
-        of bvDown: result = "┬"
-      of lsDouble:
-        case c.vert
-        of bvNone: result = "─"
-        of bvVert: result = "╫"
-        of bvUp:   result = "╨"
-        of bvDown: result = "╥"
-    of lsDouble:
-      case c.vertStyle:
-      of lsSingle:
-        case c.vert
-        of bvNone: result = "═"
-        of bvVert: result = "╪"
-        of bvUp:   result = "╧"
-        of bvDown: result = "╤"
-      of lsDouble:
-        case c.vert
-        of bvNone: result = "═"
-        of bvVert: result = "╬"
-        of bvUp:   result = "╩"
-        of bvDown: result = "╦"
-
-  of bhLeft:
-    case c.horizStyle
-    of lsSingle:
-      case c.vertStyle
-      of lsSingle:
-        case c.vert
-        of bvNone: result = "─"
-        of bvVert: result = "┤"
-        of bvUp:   result = "┘"
-        of bvDown: result = "┐"
-      of lsDouble:
-        case c.vert
-        of bvNone: result = "─"
-        of bvVert: result = "╢"
-        of bvUp:   result = "╜"
-        of bvDown: result = "╖"
-    of lsDouble:
-      case c.vertStyle
-      of lsSingle:
-        case c.vert
-        of bvNone: result = "═"
-        of bvVert: result = "╡"
-        of bvUp:   result = "╛"
-        of bvDown: result = "╕"
-      of lsDouble:
-        case c.vert
-        of bvNone: result = "═"
-        of bvVert: result = "╣"
-        of bvUp:   result = "╝"
-        of bvDown: result = "╗"
-
-  of bhRight:
-    case c.horizStyle
-    of lsSingle:
-      case c.vertStyle
-      of lsSingle:
-        case c.vert
-        of bvNone: result = "─"
-        of bvVert: result = "├"
-        of bvUp:   result = "└"
-        of bvDown: result = "┌"
-      of lsDouble:
-        case c.vert
-        of bvNone: result = "─"
-        of bvVert: result = "╟"
-        of bvUp:   result = "╙"
-        of bvDown: result = "╓"
-    of lsDouble:
-      case c.vertStyle
-      of lsSingle:
-        case c.vert
-        of bvNone: result = "═"
-        of bvVert: result = "╞"
-        of bvUp:   result = "╘"
-        of bvDown: result = "╒"
-      of lsDouble:
-        case c.vert
-        of bvNone: result = "═"
-        of bvVert: result = "╠"
-        of bvUp:   result = "╚"
-        of bvDown: result = "╔"
-
+proc toUTF8String*(c: BoxChar): string = gBoxCharsUnicode[c]
 
 type BoxBuffer* = ref object
   width: Natural
@@ -889,12 +846,12 @@ proc `[]=`*(b: var BoxBuffer, x, y: Natural, c: BoxChar) =
   if x < b.width and y < b.height:
     b.buf[b.width * y + x] = c
 
-proc `[]`*(b: BoxBuffer, x, y: Natural):  BoxChar =
+proc `[]`*(b: BoxBuffer, x, y: Natural): BoxChar =
   if x < b.width and y < b.height:
     result = b.buf[b.width * y + x]
 
 proc drawHorizLine*(b: var BoxBuffer, x1, x2, y: Natural,
-                    style: BoxLineStyle = lsSingle) =
+                    doubleStyle: bool = false) =
   if y < b.height:
     var xStart = x1
     var xEnd = x2
@@ -904,17 +861,19 @@ proc drawHorizLine*(b: var BoxBuffer, x1, x2, y: Natural,
       for x in xStart..xEnd:
         let pos = y * b.width + x
         var c = b.buf[pos]
+        var h: int
         if x == xStart:
-          c.horiz = if c.horiz == bhLeft: bhHoriz else: bhRight
+          h = if (c and LEFT)  > 0: HORIZ else: RIGHT
         elif x == xEnd:
-          c.horiz = if c.horiz == bhRight: bhHoriz else: bhLeft
+          h = if (c and RIGHT) > 0: HORIZ else: LEFT
         else:
-          c.horiz = bhHoriz
-        c.horizStyle = style
-        b.buf[pos] = c
+          h = HORIZ
+        if doubleStyle:
+          h = h or H_DBL
+        b.buf[pos] = c or h
 
 proc drawVertLine*(b: var BoxBuffer, x, y1, y2: Natural,
-                  style: BoxLineStyle = lsSingle) =
+                   doubleStyle: bool = false) =
   if x < b.width:
     var yStart = y1
     var yEnd = y2
@@ -924,14 +883,16 @@ proc drawVertLine*(b: var BoxBuffer, x, y1, y2: Natural,
       for y in yStart..yEnd:
         let pos = y * b.width + x
         var c = b.buf[pos]
+        var v: int
         if y == yStart:
-          c.vert = if c.vert == bvUp: bvVert else: bvDown
+          v = if (c and UP)   > 0: VERT else: DOWN
         elif y == yEnd:
-          c.vert = if c.vert == bvDown: bvVert else: bvUp
+          v = if (c and DOWN) > 0: VERT else: UP
         else:
-          c.vert = bvVert
-        c.vertStyle = style
-        b.buf[pos] = c
+          v = VERT
+        if doubleStyle:
+          v = v or V_DBL
+        b.buf[pos] = c or v
 
 proc write*(cb: var ConsoleBuffer, b: BoxBuffer) =
   let width = min(cb.width, b.width)
@@ -939,8 +900,8 @@ proc write*(cb: var ConsoleBuffer, b: BoxBuffer) =
   for y in 0..<height:
     for x in 0..<width:
       let boxChar = b.buf[y * b.width + x]
-      if not boxChar.isEmpty:
-        var c = ConsoleChar(ch: (boxChar.toUTF8String).runeAt(0),
+      if boxChar > 0:
+        var c = ConsoleChar(ch: toUTF8String(boxChar).runeAt(0),
                             fg: cb.currFg, bg: cb.currBg, style: cb.currStyle)
         cb[x,y] = c
 
@@ -981,22 +942,22 @@ when isMainModule:
     var cb = newConsoleBuffer(80, 40)
 #    cb.write(x, 0, "yikes!")
 #    cb.write(x+0, 1, "1 2")
-#    cb.setForegroundColor(fgRed)
+#    cb.setForegroundColor(fgGreen)
 #    cb.write(x+2, 2, "NOW SOMETHING IN RED")
 #    cb.setStyle({styleBright})
 #    cb.write(x+3, 3, "bright red")
 #
-#    var bb = newBoxBuffer(cb.width, cb.height)
-#    bb.drawHorizLine(5, 20, 6)
-#    bb.drawHorizLine(5, 20, 9)
-#    bb.drawHorizLine(5, 20, 14, style = lsDouble)
-#    bb.drawVertLine(3, 6, 14)
-#    bb.drawVertLine(5, 6, 14)
-#    bb.drawVertLine(8, 5, 14, style = lsDouble)
-#    bb.drawVertLine(3, 6, 14)
-#    bb.drawVertLine(5, 6, 14)
-#    bb.drawVertLine(8, 5, 14, style = lsDouble)
-#    bb.drawVertLine(20, 6, 14, style = lsSingle)
+    var bb = newBoxBuffer(cb.width, cb.height)
+    bb.drawHorizLine(1, 3, 0)
+    bb.drawHorizLine(5, 20, 9)
+    bb.drawHorizLine(5, 20, 14, true)
+    bb.drawVertLine(3, 6, 14)
+    bb.drawVertLine(5, 6, 14)
+    bb.drawVertLine(8, 5, 14, true)
+    bb.drawVertLine(3, 6, 14)
+    bb.drawVertLine(5, 6, 14)
+    bb.drawVertLine(8, 5, 14, true)
+    bb.drawVertLine(20, 6, 14, true)
 #    cb.write(bb)
 #    cb.setForegroundColor(fgWhite)
 #    cb.write(x+0, 1, " Songname")
@@ -1004,9 +965,30 @@ when isMainModule:
 #    cb.write(x+10, 1, " Man's mind")
 
 #    cb.display()
-
 #    sleep(500)
 
+#    cb = newConsoleBuffer(80, 40)
+#    cb.setForegroundColor(fgGreen)
+#    bb = newBoxBuffer(cb.width, cb.height)
+#    bb.drawHorizLine(5, 20, 6)
+#    bb.drawHorizLine(5, 20, 9)
+#    bb.drawHorizLine(5, 20, 14, true)
+#    bb.drawVertLine(3, 6, 14)
+#    bb.drawVertLine(5, 6, 14)
+#    bb.drawVertLine(8, 5, 14, style = lsDouble)
+#    bb.drawVertLine(3, 6, 14)
+#    bb.drawVertLine(5, 6, 14)
+#    bb.drawVertLine(8, 5, 14, style = lsDouble)
+#    bb.drawVertLine(20, 6, 14, style = lsSingle)
+    cb.write(bb)
+
+#    cb.setForegroundColor(fgWhite)
+#    cb.write(x+0, 1, " Songname")
+#    cb.setForegroundColor(fgCyan)
+#    cb.write(x+10, 1, " Man's mind")
+
+    cb.display()
+#    sleep(500)
 #    var cb2 = newConsoleBuffer(80, 40)
 #    cb2.write(x, 0, "yikes!")
 #    cb2.write(x+0, 1, "1 N 2")
