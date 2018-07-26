@@ -443,89 +443,13 @@ proc exitFullscreen*() =
     eraseScreen()
 
 
-#[
-type BoxChars* = object
-  boxHoriz*:     string
-  boxHorizUp*:   string
-  boxHorizDown*: string
-  boxVert*:      string
-  boxVertLeft*:  string
-  boxVertRight*: string
-  boxVertHoriz*: string
-  boxUpRight*:   string
-  boxUpLeft*:    string
-  boxDownLeft*:  string
-  boxDownRight*: string
-  fullBlock*:    string
-  darkShade*:    string
-  mediumShade*:  string
-  lightShade*:   string
-
-let boxCharsUnicode* = BoxChars(
-  boxHoriz:     "─",
-  boxHorizUp:   "┴",
-  boxHorizDown: "┬",
-  boxVert:      "│",
-  boxVertLeft:  "┤",
-  boxVertRight: "├",
-  boxVertHoriz: "┼",
-  boxUpRight:   "└",
-  boxUpLeft:    "┘",
-  boxDownLeft:  "┐",
-  boxDownRight: "┌",
-  fullBlock:    "█",
-  darkShade:    "▓",
-  mediumShade:  "▒",
-  lightShade:   "░"
-)
-
-let boxCharsAscii* = BoxChars(
-  boxHoriz:     "-",
-  boxHorizUp:   "+",
-  boxHorizDown: "+",
-  boxVert:      "|",
-  boxVertLeft:  "+",
-  boxVertRight: "+",
-  boxVertHoriz: "+",
-  boxUpRight:   "+",
-  boxUpLeft:    "+",
-  boxDownLeft:  "+",
-  boxDownRight: "+",
-  fullBlock:    "#",
-  darkShade:    "#",
-  mediumShade:  " ",
-  lightShade:   " "
-)
-]#
-
-#[
-when defined(posix):
-  # TODO doesn't work... why?
-  onSignal(SIGTSTP):
-    signal(SIGTSTP, SIG_DFL)
-    exitFullscreen()
-    resetAttributes()
-    consoleDeinit()
-    showCursor()
-    discard `raise`(SIGTSTP)
-
-  onSignal(SIGCONT):
-    enterFullscreen()
-    consoleInit()
-    hideCursor()
-
-  var SIGWINCH* {.importc, header: "<signal.h>".}: cint
-
-  onSignal(SIGWINCH):
-    quit(1)
-]#
-
 type
   ConsoleChar* = object
     ch*: Rune
     fg*: ForegroundColor
     bg*: BackgroundColor
     style*: set[Style]
+    forceWrite*: bool
 
   ConsoleBuffer* = ref object
     width: int
@@ -705,7 +629,7 @@ proc displayDiff(cb: ConsoleBuffer) =
     bufYPos = y
     for x in 0..<cb.width:
       let c = cb[x,y]
-      if c != prevConsoleBuffer[x,y]:
+      if c != prevConsoleBuffer[x,y] or c.forceWrite:
         if c.bg != currBg or c.fg != currFg or c.style != currStyle:
           flushBuf()
           bufXPos = x
@@ -894,15 +818,34 @@ proc drawVertLine*(b: var BoxBuffer, x, y1, y2: Natural,
           v = v or V_DBL
         b.buf[pos] = c or v
 
-proc write*(cb: var ConsoleBuffer, b: BoxBuffer) =
+
+proc write*(cb: var ConsoleBuffer, b: var BoxBuffer) =
   let width = min(cb.width, b.width)
   let height = min(cb.height, b.height)
+  var horizBoxCharCount: int
+  var forceWrite: bool
+
   for y in 0..<height:
+    horizBoxCharCount = 0
+    forceWrite = false
     for x in 0..<width:
-      let boxChar = b.buf[y * b.width + x]
+      let boxChar = b[x,y]
       if boxChar > 0:
+        if ((boxChar and LEFT) or (boxChar and RIGHT)) > 0:
+          if horizBoxCharCount == 1:
+            var prev = cb[x-1,y]
+            prev.forceWrite = true
+            cb[x-1,y] = prev
+          elif horizBoxCharCount >= 1:
+            forceWrite = true
+          inc(horizBoxCharCount)
+        else:
+          horizBoxCharCount = 0
+          forceWrite = false
+
         var c = ConsoleChar(ch: toUTF8String(boxChar).runeAt(0),
-                            fg: cb.currFg, bg: cb.currBg, style: cb.currStyle)
+                            fg: cb.currFg, bg: cb.currBg, style: cb.currStyle,
+                            forceWrite: forceWrite)
         cb[x,y] = c
 
 
