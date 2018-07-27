@@ -840,7 +840,7 @@ proc write*(cb: var ConsoleBuffer, b: var BoxBuffer) =
             var prev = cb[x-1,y]
             prev.forceWrite = true
             cb[x-1,y] = prev
-          elif horizBoxCharCount >= 1:
+          if horizBoxCharCount >= 1:
             forceWrite = true
           inc(horizBoxCharCount)
         else:
@@ -886,25 +886,28 @@ when isMainModule:
 
     sleep(20)
 
-#    var cb = newConsoleBuffer(80, 40)
+    var cb = newConsoleBuffer(80, 40)
 #    cb.write(x, 0, "yikes!")
 #    cb.write(x+0, 1, "1 2")
-#    cb.setForegroundColor(fgGreen)
+    cb.setForegroundColor(fgGreen)
 #    cb.write(x+2, 2, "NOW SOMETHING IN RED")
 #    cb.setStyle({styleBright})
 #    cb.write(x+3, 3, "bright red")
 #
     var bb = newBoxBuffer(cb.width, cb.height)
-    bb.drawHorizLine(1, 3, 0)
-    bb.drawHorizLine(5, 20, 9)
-    bb.drawHorizLine(5, 20, 14, true)
-    bb.drawVertLine(3, 6, 14)
-    bb.drawVertLine(5, 6, 14)
-    bb.drawVertLine(8, 5, 14, true)
-    bb.drawVertLine(3, 6, 14)
-    bb.drawVertLine(5, 6, 14)
-    bb.drawVertLine(8, 5, 14, true)
-    bb.drawVertLine(20, 6, 14, true)
+    bb.drawHorizLine(0, 5, 0)
+#    bb.drawVertLine(1, 0, 0)
+#    bb.drawVertLine(4, 0, 0)
+#    bb.drawVertLine(8, 0, 0)
+#    bb.drawHorizLine(5, 20, 9)
+#    bb.drawHorizLine(5, 20, 14, true)
+#    bb.drawVertLine(3, 6, 14)
+#    bb.drawVertLine(5, 6, 14)
+#    bb.drawVertLine(8, 5, 14, true)
+#    bb.drawVertLine(3, 6, 14)
+#    bb.drawVertLine(5, 6, 14)
+#    bb.drawVertLine(8, 5, 14, true)
+#    bb.drawVertLine(20, 6, 14, true)
 #    cb.write(bb)
 #    cb.setForegroundColor(fgWhite)
 #    cb.write(x+0, 1, " Songname")
@@ -928,13 +931,16 @@ when isMainModule:
 #    bb.drawVertLine(8, 5, 14, style = lsDouble)
 #    bb.drawVertLine(20, 6, 14, style = lsSingle)
     cb.write(bb)
+    cb.display()
 
+    sleep(800)
+
+    cb.display()
 #    cb.setForegroundColor(fgWhite)
 #    cb.write(x+0, 1, " Songname")
 #    cb.setForegroundColor(fgCyan)
 #    cb.write(x+10, 1, " Man's mind")
 
-    cb.display()
 #    sleep(500)
 #    var cb2 = newConsoleBuffer(80, 40)
 #    cb2.write(x, 0, "yikes!")
