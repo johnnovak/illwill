@@ -509,6 +509,23 @@ proc copyFrom*(cb: var ConsoleBuffer, src: ConsoleBuffer) =
     for x in 0..<w:
       cb[x,y] = src[x,y]
 
+
+proc copyFrom*(cb: var ConsoleBuffer,
+               src: ConsoleBuffer, srcX, srcY, width, height: Natural,
+               destX, destY: Natural) =
+  let
+    srcWidth = max(src.width - srcX, 0)
+    srcHeight = max(src.height - srcY, 0)
+    destWidth = max(cb.width - destX, 0)
+    destHeight = max(cb.height - destY, 0)
+    w = min(min(srcWidth, destWidth), width)
+    h = min(min(srcHeight, destHeight), height)
+
+  for yOffs in 0..<h:
+    for xOffs in 0..<w:
+      cb[xOffs + destX, yOffs + destY] = src[xOffs + srcX, yOffs + srcY]
+
+
 proc newConsoleBufferFrom*(src: ConsoleBuffer): ConsoleBuffer =
   var cb = new ConsoleBuffer
   cb.initConsoleBuffer(src.width, src.height)
