@@ -1,11 +1,26 @@
-## Module documentation *TODO* ``code``
+## This is a ``curses`` inspired simple terminal library that aims to make
+## writing cross-platform text mode applications easier. The main features are
+## as follows:
 ##
-## Example:
+## * Non-blocking keyboard input
+## * Support for key combinations and special keys available both in the
+##   standard Windows Console (``cmd.exe``) and most common POSIX terminals
+## * Virtual terminal buffers with double-buffering support (only
+##   display changes from the previous frame and minimise the number of
+##   attribute changes)
+## * Simple graphics using UTF-8 box drawing characters
+## * Full-screen support (restore the contents of the terminal after exit)
 ##
-## .. code-block:: nim
+## The module depends only on the standard `terminal` module. However, you
+## should not use any `terminal` functions directly, neither should you use
+## ``echo``, ``write`` or other similar functions for output. You should only
+## use the interface provided by the module to interact with the terminal.
 ##
-##   proc error(msg: string) =
-##     styledWriteLine(stderr, fgRed, "Error: ", resetStyle, msg)
+## The following symbols are exported from the `terminal` module (these are
+## safe to use):
+##
+## ``terminalWidth()``, ``terminalHeight()``, ``terminalSize()``,
+## ``hideCursor()``, ``showCursor()``, ``Style``
 ##
 
 import os, strformat, terminal, unicode
@@ -40,7 +55,7 @@ type
     bgCyan,                 ## cyan
     bgWhite                 ## white
 
-  Key* {.pure.} = enum
+  Key* {.pure.} = enum      ## Supported single key presses and key combinations
     None = (-1, "None"),
 
     # Special ASCII characters
@@ -212,9 +227,11 @@ proc toKey(c: int): Key =
     result = Key.None
 
 
+# Required for Nim 18.0 workarounds, remove when 18.1 is out
 template isNimPre0_18_1: bool =
   NimMajor <= 0 and NimMinor <= 18 and NimPatch <= 0
 
+var gFullscreen = false
 
 when defined(windows):
   import encodings, unicode, winlean
@@ -222,13 +239,10 @@ when defined(windows):
   proc kbhit(): cint {.importc: "_kbhit", header: "<conio.h>".}
   proc getch(): cint {.importc: "_getch", header: "<conio.h>".}
 
-  proc consoleInit*() =
-    resetAttributes()
+  proc consoleInit() = discard
+  proc consoleDeinit() = discard
 
-  proc consoleDeinit*() =
-    resetAttributes()
-
-  proc getKey*(): Key =
+  proc getKeyAsync(): Key =
     var key = Key.None
 
     if kbhit() > 0:
@@ -332,13 +346,8 @@ else:  # OS X & Linux
     return FD_ISSET(STDIN_FILENO, fds)
 
 
-  proc consoleInit*() =
-    resetAttributes()
-    nonblock(true)
-
-  proc consoleDeinit*() =
-    resetAttributes()
-    nonblock(false)
+  proc consoleInit() = nonblock(true)
+  proc consoleDeinit() = nonblock(false)
 
   # surely a 100 char buffer is more than enough; the longest
   # keycode sequence I've seen was 6 chars
@@ -401,7 +410,7 @@ else:  # OS X & Linux
             key = toKey(keyCode)
     result = key
 
-  proc getKey*(): Key =
+  proc getKeyAsync(): Key =
     var i = 0
     while kbhit() > 0 and i < KEY_SEQUENCE_MAXLEN:
       var ret = read(0, keyBuf[i].addr, 1)
@@ -421,8 +430,8 @@ const
   XTERM_COLOR    = "xterm-color"
   XTERM_256COLOR = "xterm-256color"
 
-proc enterFullscreen*() =
-  ## stuff
+proc enterFullscreen() =
+  ## Enters full screen mode (clears the terminal).
   when defined(posix):
     case getEnv("TERM"):
     of XTERM_COLOR:
@@ -434,7 +443,8 @@ proc enterFullscreen*() =
   else:
     eraseScreen()
 
-proc exitFullscreen*() =
+proc exitFullscreen() =
+  ## Exits full screen mode (restores the previous contents of the terminal).
   when defined(posix):
     case getEnv("TERM"):
     of XTERM_COLOR:
@@ -446,167 +456,256 @@ proc exitFullscreen*() =
   else:
     eraseScreen()
 
+proc illwillInit*(fullscreen: bool = true) =
+  ## Initializes the terminal and enabled non-blocking keyboard input. `Needs
+  ## to be called before doing anything with the library!`
+  gFullscreen = fullscreen
+  if gFullscreen: enterFullscreen()
+  consoleInit()
+  resetAttributes()
+
+proc illwillDeinit*() =
+  ## Resets the terminal to its previous state. `Needs to be called before
+  ## exit!`
+  if gFullscreen: exitFullscreen()
+  consoleDeinit()
+  resetAttributes()
+  showCursor()
+
+proc getKey*(): Key =
+  ## Reads the next keystroke in a non-blocking manner. If there are no
+  ## keypress events in the buffer, ``Key.None`` is returned.
+  getKeyAsync()
+
 
 type
-  ConsoleChar* = object
+  TerminalChar* = object
+    ## Represents a character in the terminal buffer, including color and
+    ## style information.
     ch*: Rune
     fg*: ForegroundColor
     bg*: BackgroundColor
     style*: set[Style]
     forceWrite*: bool
 
-  ConsoleBuffer* = ref object
+  TerminalBuffer* = ref object
+    ## A virtual terminal buffer of a fixed width and height. It remembers the
+    ## current color and style settings and the current cursor position.
+    ##
+    ## Write to the terminal buffer with the ``TerminalBuffer.write()``
+    ## function or you can read and write characters directly using the index
+    ## operators:
+    ##
+    ## .. code-block::
+    ##   # Create a new terminal buffer
+    ##   var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
+    ##
+    ##   # Write the character "X" to the top left of the terminal then read it back
+    ##   tb[0,0] = TerminalChar("X".runeAt(0), fgWhite, bgNone, style = {})
+    ##   let ch = tb[0,0]
+    ##
+    ##   # Write "foo" at position (10,10) in bright red
+    ##   tb.setForegroundColor(fgRed, bright=true)
+    ##   tb.setCursorPos(10, 10)
+    ##   tb.write("foo")
+    ##
+    ##   # Write "bar" at position (15,12) in bright red, without changing
+    ##   # the current cursor position
+    ##   tb.write(15, 12, "bar")
+    ##
+    ##   # Output the contents of the buffer to the screen
+    ##   tb.display()
+    ##
     width: int
     height: int
-    buf: seq[ConsoleChar]
+    buf: seq[TerminalChar]
     currBg: BackgroundColor
     currFg: ForegroundColor
     currStyle: set[Style]
     currX: Natural
     currY: Natural
 
-proc `[]=`*(cb: var ConsoleBuffer, x, y: Natural, ch: ConsoleChar) =
-  if x < cb.width and y < cb.height:
-    cb.buf[cb.width * y + x] = ch
+proc `[]=`*(tb: var TerminalBuffer, x, y: Natural, ch: TerminalChar) =
+  if x < tb.width and y < tb.height:
+    tb.buf[tb.width * y + x] = ch
 
-proc `[]`*(cb: ConsoleBuffer, x, y: Natural): ConsoleChar =
-  if x < cb.width and y < cb.height:
-    result = cb.buf[cb.width * y + x]
-
-proc clear*(cb: var ConsoleBuffer, ch: string = " ",
-            fg: ForegroundColor = fgNone, bg: BackgroundColor = bgNone,
-            style: set[Style] = {}) =
-  let c = ConsoleChar(ch: ch.runeAt(0), fg: fg, bg: bg, style: style)
-  for y in 0..<cb.height:
-    for x in 0..<cb.width:
-      cb[x,y] = c
-
-proc initConsoleBuffer(cb: var ConsoleBuffer, width, height: Natural) =
-  cb.width = width
-  cb.height = height
-  newSeq(cb.buf, width * height)
-  cb.currBg = bgNone
-  cb.currFg = fgNone
-  cb.currStyle = {}
-
-proc newConsoleBuffer*(width, height: Natural): ConsoleBuffer =
-  var cb = new ConsoleBuffer
-  cb.initConsoleBuffer(width, height)
-  cb.clear()
-  result = cb
-
-proc width*(cb: ConsoleBuffer): Natural =
-  result = cb.width
-
-proc height*(cb: ConsoleBuffer): Natural =
-  result = cb.height
-
-proc copyFrom*(cb: var ConsoleBuffer, src: ConsoleBuffer) =
-  let
-    w = min(cb.width, src.width)
-    h = min(cb.height, src.height)
-  for y in 0..<h:
-    for x in 0..<w:
-      cb[x,y] = src[x,y]
+proc `[]`*(tb: TerminalBuffer, x, y: Natural): TerminalChar =
+  if x < tb.width and y < tb.height:
+    result = tb.buf[tb.width * y + x]
 
 
-proc copyFrom*(cb: var ConsoleBuffer,
-               src: ConsoleBuffer, srcX, srcY, width, height: Natural,
+proc fill*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural, ch: string = " ") =
+  if x1 < tb.width and y1 < tb.height:
+    let
+      c = TerminalChar(ch: ch.runeAt(0), fg: tb.currFg, bg: tb.currBg,
+                       style: tb.currStyle)
+
+      xe = min(x2, tb.width-1)
+      ye = min(y2, tb.height-1)
+
+    for y in y1..ye:
+      for x in x1..xe:
+        tb[x, y] = c
+
+
+proc clear*(tb: var TerminalBuffer, ch: string = " ") =
+  let c = TerminalChar(ch: ch.runeAt(0), fg: fgNone, bg: bgNone, style: {})
+  tb.fill(0, 0, tb.width-1, tb.height-1, ch)
+
+proc initTerminalBuffer(tb: var TerminalBuffer, width, height: Natural) =
+  tb.width = width
+  tb.height = height
+  newSeq(tb.buf, width * height)
+  tb.currBg = bgNone
+  tb.currFg = fgNone
+  tb.currStyle = {}
+
+proc newTerminalBuffer*(width, height: Natural): TerminalBuffer =
+  var tb = new TerminalBuffer
+  tb.initTerminalBuffer(width, height)
+  tb.clear()
+  result = tb
+
+proc width*(tb: TerminalBuffer): Natural =
+  result = tb.width
+
+proc height*(tb: TerminalBuffer): Natural =
+  result = tb.height
+
+proc copyFrom*(tb: var TerminalBuffer,
+               src: TerminalBuffer, srcX, srcY, width, height: Natural,
                destX, destY: Natural) =
   let
     srcWidth = max(src.width - srcX, 0)
     srcHeight = max(src.height - srcY, 0)
-    destWidth = max(cb.width - destX, 0)
-    destHeight = max(cb.height - destY, 0)
+    destWidth = max(tb.width - destX, 0)
+    destHeight = max(tb.height - destY, 0)
     w = min(min(srcWidth, destWidth), width)
     h = min(min(srcHeight, destHeight), height)
 
   for yOffs in 0..<h:
     for xOffs in 0..<w:
-      cb[xOffs + destX, yOffs + destY] = src[xOffs + srcX, yOffs + srcY]
+      tb[xOffs + destX, yOffs + destY] = src[xOffs + srcX, yOffs + srcY]
 
 
-proc newConsoleBufferFrom*(src: ConsoleBuffer): ConsoleBuffer =
-  var cb = new ConsoleBuffer
-  cb.initConsoleBuffer(src.width, src.height)
-  cb.copyFrom(src)
-  result = cb
+proc copyFrom*(tb: var TerminalBuffer, src: TerminalBuffer) =
+  tb.copyFrom(src, 0, 0, src.width, src.height, 0, 0)
 
-proc setBackgroundColor*(cb: var ConsoleBuffer, bg: BackgroundColor) =
-  cb.currBg = bg
+proc newTerminalBufferFrom*(src: TerminalBuffer): TerminalBuffer =
+  var tb = new TerminalBuffer
+  tb.initTerminalBuffer(src.width, src.height)
+  tb.copyFrom(src)
+  result = tb
 
-proc setForegroundColor*(cb: var ConsoleBuffer, fg: ForegroundColor) =
-  cb.currFg = fg
+proc setCursorPos*(tb: var TerminalBuffer, x, y: Natural) =
+  tb.currX = x
+  tb.currY = y
 
-proc setStyle*(cb: var ConsoleBuffer, style: set[Style]) =
-  cb.currStyle = style
+proc setCursorXPos*(tb: var TerminalBuffer, x: Natural) =
+  tb.currX = x
 
-proc getBackgroundColor*(cb: var ConsoleBuffer): BackgroundColor =
-  result = cb.currBg
+proc setCursorYPos*(tb: var TerminalBuffer, y: Natural) =
+  tb.currY = y
 
-proc getForegroundColor*(cb: var ConsoleBuffer): ForegroundColor =
-  result = cb.currFg
+proc setBackgroundColor*(tb: var TerminalBuffer, bg: BackgroundColor) =
+  tb.currBg = bg
 
-proc getStyle*(cb: var ConsoleBuffer): set[Style] =
-  result = cb.currStyle
+proc setForegroundColor*(tb: var TerminalBuffer, fg: ForegroundColor,
+                         bright: bool = false) =
+  if bright:
+    incl(tb.currStyle, styleBright)
+  else:
+    excl(tb.currStyle, styleBright)
+  tb.currFg = fg
 
-proc write*(cb: var ConsoleBuffer, x, y: Natural, s: string) =
+proc setStyle*(tb: var TerminalBuffer, style: set[Style]) =
+  tb.currStyle = style
+
+proc getCursorPos*(tb: TerminalBuffer): tuple[x: Natural, y: Natural] =
+  result = (tb.currX, tb.currY)
+
+proc getCursorXPos*(tb: TerminalBuffer): Natural =
+  result = tb.currX
+
+proc getCursorYPos*(tb: TerminalBuffer): Natural =
+  result = tb.currY
+
+proc getBackgroundColor*(tb: var TerminalBuffer): BackgroundColor =
+  result = tb.currBg
+
+proc getForegroundColor*(tb: var TerminalBuffer): ForegroundColor =
+  result = tb.currFg
+
+proc getStyle*(tb: var TerminalBuffer): set[Style] =
+  result = tb.currStyle
+
+proc resetAttributes*(tb: var TerminalBuffer) =
+  tb.setBackgroundColor(bgNone)
+  tb.setForegroundColor(fgWhite)
+  tb.setStyle({})
+
+proc write*(tb: var TerminalBuffer, x, y: Natural, s: string) =
+  ## Write a string into the buffer starting at the specified position using
+  ## the current attributes. Lines do not wrap and attempting to write outside
+  ## the extents of the buffer will not raise an error; the string will be
+  ## simply cropped to the visible area.
+
   var currX = x
   for ch in runes(s):
-    var c = ConsoleChar(ch: ch, fg: cb.currFg, bg: cb.currBg,
-                        style: cb.currStyle)
-    cb[currX, y] = c
+    var c = TerminalChar(ch: ch, fg: tb.currFg, bg: tb.currBg,
+                         style: tb.currStyle)
+    tb[currX, y] = c
     inc(currX)
-  cb.currX = currX
-  cb.currY = y
+  tb.currX = currX
+  tb.currY = y
 
-proc write*(cb: var ConsoleBuffer, s: string) =
-  write(cb, cb.currX, cb.currY, s)
+proc write*(tb: var TerminalBuffer, s: string) =
+  write(tb, tb.currX, tb.currY, s)
 
 
 var
-  prevConsoleBuffer: ConsoleBuffer
-  currBg: BackgroundColor
-  currFg: ForegroundColor
-  currStyle: set[Style]
+  gPrevTerminalBuffer: TerminalBuffer
+  gCurrBg: BackgroundColor
+  gCurrFg: ForegroundColor
+  gCurrStyle: set[Style]
 
-proc setAttribs(c: ConsoleChar) =
+proc setAttribs(c: TerminalChar) =
   if c.bg == bgNone or c.fg == fgNone or c.style == {}:
     resetAttributes()
-    currBg = c.bg
-    currFg = c.fg
-    currStyle = c.style
-    if currBg != bgNone:
-      setBackgroundColor(cast[terminal.BackgroundColor](currBg))
-    if currFg != fgNone:
-      setForegroundColor(cast[terminal.ForegroundColor](currFg))
-    if currStyle != {}:
-      setStyle(currStyle)
+    gCurrBg = c.bg
+    gCurrFg = c.fg
+    gCurrStyle = c.style
+    if gCurrBg != bgNone:
+      setBackgroundColor(cast[terminal.BackgroundColor](gCurrBg))
+    if gCurrFg != fgNone:
+      setForegroundColor(cast[terminal.ForegroundColor](gCurrFg))
+    if gCurrStyle != {}:
+      setStyle(gCurrStyle)
   else:
-    if c.bg != currBg:
-      currBg = c.bg
-      setBackgroundColor(cast[terminal.BackgroundColor](currBg))
-    if c.fg != currFg:
-      currFg = c.fg
-      setForegroundColor(cast[terminal.ForegroundColor](currFg))
-    if c.style != currStyle:
-      currStyle = c.style
-      setStyle(currStyle)
+    if c.bg != gCurrBg:
+      gCurrBg = c.bg
+      setBackgroundColor(cast[terminal.BackgroundColor](gCurrBg))
+    if c.fg != gCurrFg:
+      gCurrFg = c.fg
+      setForegroundColor(cast[terminal.ForegroundColor](gCurrFg))
+    if c.style != gCurrStyle:
+      gCurrStyle = c.style
+      setStyle(gCurrStyle)
 
 proc setPos(x, y: Natural) =
   when isNimPre0_18_1() and defined(posix):
-    setCursorPos(x+1, y+1)
+    terminal.setCursorPos(x+1, y+1)
   else:
-    setCursorPos(x, y)
+    terminal.setCursorPos(x, y)
 
 proc setXPos(x: Natural) =
   when isNimPre0_18_1() and defined(posix):
-    setCursorXPos(x+1)
+    terminal.setCursorXPos(x+1)
   else:
-    setCursorXPos(x)
+    terminal.setCursorXPos(x)
 
 
-proc displayFull(cb: ConsoleBuffer) =
+proc displayFull(tb: TerminalBuffer) =
   var buf = ""
 
   proc flushBuf() =
@@ -614,18 +713,18 @@ proc displayFull(cb: ConsoleBuffer) =
       put buf
       buf = ""
 
-  for y in 0..<cb.height:
+  for y in 0..<tb.height:
     setPos(0, y)
-    for x in 0..<cb.width:
-      let c = cb[x,y]
-      if c.bg != currBg or c.fg != currFg or c.style != currStyle:
+    for x in 0..<tb.width:
+      let c = tb[x,y]
+      if c.bg != gCurrBg or c.fg != gCurrFg or c.style != gCurrStyle:
         flushBuf()
         setAttribs(c)
       buf &= $c.ch
     flushBuf()
 
 
-proc displayDiff(cb: ConsoleBuffer) =
+proc displayDiff(tb: TerminalBuffer) =
   var
     buf = ""
     bufXPos, bufYPos: Natural
@@ -645,13 +744,13 @@ proc displayDiff(cb: ConsoleBuffer) =
       inc(currXPos, buf.runeLen)
       buf = ""
 
-  for y in 0..<cb.height:
+  for y in 0..<tb.height:
     bufXPos = 0
     bufYPos = y
-    for x in 0..<cb.width:
-      let c = cb[x,y]
-      if c != prevConsoleBuffer[x,y] or c.forceWrite:
-        if c.bg != currBg or c.fg != currFg or c.style != currStyle:
+    for x in 0..<tb.width:
+      let c = tb[x,y]
+      if c != gPrevTerminalBuffer[x,y] or c.forceWrite:
+        if c.bg != gCurrBg or c.fg != gCurrFg or c.style != gCurrStyle:
           flushBuf()
           bufXPos = x
           setAttribs(c)
@@ -662,28 +761,28 @@ proc displayDiff(cb: ConsoleBuffer) =
     flushBuf()
 
 
-var doubleBufferingEnabled = true
+var gDoubleBufferingEnabled = true
 
 proc setDoubleBuffering*(enabled: bool) =
-  doubleBufferingEnabled = enabled
-  prevConsoleBuffer = nil
+  gDoubleBufferingEnabled = enabled
+  gPrevTerminalBuffer = nil
 
-proc display*(cb: ConsoleBuffer) =
-  if doubleBufferingEnabled:
-    if prevConsoleBuffer == nil:
-      displayFull(cb)
-      prevConsoleBuffer = newConsoleBufferFrom(cb)
+proc display*(tb: TerminalBuffer) =
+  if gDoubleBufferingEnabled:
+    if gPrevTerminalBuffer == nil:
+      displayFull(tb)
+      gPrevTerminalBuffer = newTerminalBufferFrom(tb)
     else:
-      if cb.width == prevConsoleBuffer.width and
-         cb.height == prevConsoleBuffer.height:
-        displayDiff(cb)
-        prevConsoleBuffer.copyFrom(cb)
+      if tb.width == gPrevTerminalBuffer.width and
+         tb.height == gPrevTerminalBuffer.height:
+        displayDiff(tb)
+        gPrevTerminalBuffer.copyFrom(tb)
       else:
-        displayFull(cb)
-        prevConsoleBuffer = newConsoleBufferFrom(cb)
+        displayFull(tb)
+        gPrevTerminalBuffer = newTerminalBufferFrom(tb)
     flushFile(stdout)
   else:
-    displayFull(cb)
+    displayFull(tb)
     flushFile(stdout)
 
 
@@ -787,6 +886,12 @@ proc newBoxBuffer*(width, height: Natural): BoxBuffer =
   result.height = height
   newSeq(result.buf, width * height)
 
+proc width*(bb: BoxBuffer): Natural =
+  result = bb.width
+
+proc height*(bb: BoxBuffer): Natural =
+  result = bb.height
+
 proc `[]=`*(b: var BoxBuffer, x, y: Natural, c: BoxChar) =
   if x < b.width and y < b.height:
     b.buf[b.width * y + x] = c
@@ -794,6 +899,31 @@ proc `[]=`*(b: var BoxBuffer, x, y: Natural, c: BoxChar) =
 proc `[]`*(b: BoxBuffer, x, y: Natural): BoxChar =
   if x < b.width and y < b.height:
     result = b.buf[b.width * y + x]
+
+
+proc copyFrom*(bb: var BoxBuffer,
+               src: BoxBuffer, srcX, srcY, width, height: Natural,
+               destX, destY: Natural) =
+  let
+    srcWidth = max(src.width - srcX, 0)
+    srcHeight = max(src.height - srcY, 0)
+    destWidth = max(bb.width - destX, 0)
+    destHeight = max(bb.height - destY, 0)
+    w = min(min(srcWidth, destWidth), width)
+    h = min(min(srcHeight, destHeight), height)
+
+  for yOffs in 0..<h:
+    for xOffs in 0..<w:
+      bb[xOffs + destX, yOffs + destY] = src[xOffs + srcX, yOffs + srcY]
+
+
+proc copyFrom*(bb: var BoxBuffer, src: BoxBuffer) =
+  bb.copyFrom(src, 0, 0, src.width, src.height, 0, 0)
+
+proc newBoxBufferFrom*(src: BoxBuffer): BoxBuffer =
+  var bb = new BoxBuffer
+  bb.copyFrom(src)
+  result = bb
 
 proc drawHorizLine*(b: var BoxBuffer, x1, x2, y: Natural,
                     doubleStyle: bool = false) =
@@ -808,7 +938,7 @@ proc drawHorizLine*(b: var BoxBuffer, x1, x2, y: Natural,
         var c = b.buf[pos]
         var h: int
         if x == xStart:
-          h = if (c and LEFT)  > 0: HORIZ else: RIGHT
+          h = if (c and LEFT) > 0: HORIZ else: RIGHT
         elif x == xEnd:
           h = if (c and RIGHT) > 0: HORIZ else: LEFT
         else:
@@ -830,7 +960,7 @@ proc drawVertLine*(b: var BoxBuffer, x, y1, y2: Natural,
         var c = b.buf[pos]
         var v: int
         if y == yStart:
-          v = if (c and UP)   > 0: VERT else: DOWN
+          v = if (c and UP) > 0: VERT else: DOWN
         elif y == yEnd:
           v = if (c and DOWN) > 0: VERT else: UP
         else:
@@ -839,10 +969,17 @@ proc drawVertLine*(b: var BoxBuffer, x, y1, y2: Natural,
           v = v or V_DBL
         b.buf[pos] = c or v
 
+proc drawRect*(b: var BoxBuffer, x1, y1, x2, y2: Natural,
+               doubleStyle: bool = false) =
+  b.drawHorizLine(x1, x2, y1, doubleStyle)
+  b.drawHorizLine(x1, x2, y2, doubleStyle)
+  b.drawVertLine(x1, y1, y2, doubleStyle)
+  b.drawVertLine(x2, y1, y2, doubleStyle)
 
-proc write*(cb: var ConsoleBuffer, b: var BoxBuffer) =
-  let width = min(cb.width, b.width)
-  let height = min(cb.height, b.height)
+
+proc write*(tb: var TerminalBuffer, b: var BoxBuffer) =
+  let width = min(tb.width, b.width)
+  let height = min(tb.height, b.height)
   var horizBoxCharCount: int
   var forceWrite: bool
 
@@ -854,9 +991,9 @@ proc write*(cb: var ConsoleBuffer, b: var BoxBuffer) =
       if boxChar > 0:
         if ((boxChar and LEFT) or (boxChar and RIGHT)) > 0:
           if horizBoxCharCount == 1:
-            var prev = cb[x-1,y]
+            var prev = tb[x-1,y]
             prev.forceWrite = true
-            cb[x-1,y] = prev
+            tb[x-1,y] = prev
           if horizBoxCharCount >= 1:
             forceWrite = true
           inc(horizBoxCharCount)
@@ -864,113 +1001,27 @@ proc write*(cb: var ConsoleBuffer, b: var BoxBuffer) =
           horizBoxCharCount = 0
           forceWrite = false
 
-        var c = ConsoleChar(ch: toUTF8String(boxChar).runeAt(0),
-                            fg: cb.currFg, bg: cb.currBg, style: cb.currStyle,
-                            forceWrite: forceWrite)
-        cb[x,y] = c
+        var c = TerminalChar(ch: toUTF8String(boxChar).runeAt(0),
+                             fg: tb.currFg, bg: tb.currBg,
+                             style: tb.currStyle, forceWrite: forceWrite)
+        tb[x,y] = c
 
 
-# TODO
-proc cleanExit() {.noconv.} =
-  consoleDeinit()
-  exitFullscreen()
-  showCursor()
-  resetAttributes()
-  quit(0)
+proc drawHorizLine*(tb: var TerminalBuffer, x1, x2, y: Natural,
+                    doubleStyle: bool = false) =
+  var bb = newBoxBuffer(tb.width, tb.height)
+  bb.drawHorizLine(x1, x2, y, doubleStyle)
+  tb.write(bb)
 
-setControlCHook(cleanExit)
+proc drawVertLine*(tb: var TerminalBuffer, x, y1, y2: Natural,
+                   doubleStyle: bool = false) =
+  var bb = newBoxBuffer(tb.width, tb.height)
+  bb.drawVertLine(x, y1, y2, doubleStyle)
+  tb.write(bb)
 
+proc drawRect*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural,
+               doubleStyle: bool = false) =
+  var bb = newBoxBuffer(tb.width, tb.height)
+  bb.drawRect(x1, y1, x2, y2, doubleStyle)
+  tb.write(bb)
 
-# TODO test code, remove
-when isMainModule:
-  # "•‹«»›←↑→↓↔↕≡▀▄█▌▐■▲►▼◄"
-
-  consoleInit()
-#  enterFullscreen()
-#  hideCursor()
-#  resetAttributes()
-
-#  var x: Natural = 0
-
-  while true:
-    var key = getKey()
-    case key
-    of Key.None: discard
-    of Key.Escape, Key.Q:
-      cleanExit()
-    else:
-      echo key
-
-    sleep(20)
-
-    var cb = newConsoleBuffer(80, 40)
-#    cb.write(x, 0, "yikes!")
-#    cb.write(x+0, 1, "1 2")
-    cb.setForegroundColor(fgGreen)
-#    cb.write(x+2, 2, "NOW SOMETHING IN RED")
-#    cb.setStyle({styleBright})
-#    cb.write(x+3, 3, "bright red")
-#
-    var bb = newBoxBuffer(cb.width, cb.height)
-    bb.drawHorizLine(0, 5, 0)
-#    bb.drawVertLine(1, 0, 0)
-#    bb.drawVertLine(4, 0, 0)
-#    bb.drawVertLine(8, 0, 0)
-#    bb.drawHorizLine(5, 20, 9)
-#    bb.drawHorizLine(5, 20, 14, true)
-#    bb.drawVertLine(3, 6, 14)
-#    bb.drawVertLine(5, 6, 14)
-#    bb.drawVertLine(8, 5, 14, true)
-#    bb.drawVertLine(3, 6, 14)
-#    bb.drawVertLine(5, 6, 14)
-#    bb.drawVertLine(8, 5, 14, true)
-#    bb.drawVertLine(20, 6, 14, true)
-#    cb.write(bb)
-#    cb.setForegroundColor(fgWhite)
-#    cb.write(x+0, 1, " Songname")
-#    cb.setForegroundColor(fgCyan)
-#    cb.write(x+10, 1, " Man's mind")
-
-#    cb.display()
-#    sleep(500)
-
-#    cb = newConsoleBuffer(80, 40)
-#    cb.setForegroundColor(fgGreen)
-#    bb = newBoxBuffer(cb.width, cb.height)
-#    bb.drawHorizLine(5, 20, 6)
-#    bb.drawHorizLine(5, 20, 9)
-#    bb.drawHorizLine(5, 20, 14, true)
-#    bb.drawVertLine(3, 6, 14)
-#    bb.drawVertLine(5, 6, 14)
-#    bb.drawVertLine(8, 5, 14, style = lsDouble)
-#    bb.drawVertLine(3, 6, 14)
-#    bb.drawVertLine(5, 6, 14)
-#    bb.drawVertLine(8, 5, 14, style = lsDouble)
-#    bb.drawVertLine(20, 6, 14, style = lsSingle)
-    cb.write(bb)
-    cb.display()
-
-    sleep(800)
-
-    cb.display()
-#    cb.setForegroundColor(fgWhite)
-#    cb.write(x+0, 1, " Songname")
-#    cb.setForegroundColor(fgCyan)
-#    cb.write(x+10, 1, " Man's mind")
-
-#    sleep(500)
-#    var cb2 = newConsoleBuffer(80, 40)
-#    cb2.write(x, 0, "yikes!")
-#    cb2.write(x+0, 1, "1 N 2")
-#    cb2.setForegroundColor(fgRed)
-#    cb2.write(x+2, 2, "NOW what SOMETHING IN RED")
-#    cb2.setStyle({styleBright})
-#    cb2.write(x+3, 3, "bright red")
-#    cb.setForegroundColor(fgGreen)
-#    cb2.write(x+10, 1, "C")
-#    cb2.setForegroundColor(fgGreen)
-#    cb2.write(x+14, 1, "12")
-
-#    cb2.display()
-
-#    sleep(1000)
