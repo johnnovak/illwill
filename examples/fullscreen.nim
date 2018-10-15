@@ -31,8 +31,11 @@ proc main() =
     tb.write(1, 2, fmt"Height: {tb.height}")
 
     tb.resetAttributes()
+    tb.write(1, 4, "Press Q, Esc or Ctrl-C to quit")
+    tb.write(1, 5, "Resize the terminal window and see what happens :)")
+
     tb.setForegroundColor(fgGreen)
-    tb.drawRect(4, 4, 12, 6, doubleStyle=true)
+    tb.drawRect(4, 7, 15, 9, doubleStyle=true)
 
     tb.display()
 
