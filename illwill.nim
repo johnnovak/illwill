@@ -220,16 +220,12 @@ type
     F12 = (1022, "F12")
 
 
-proc toKey(c: int): Key =
+func toKey(c: int): Key =
   try:
     result = Key(c)
   except RangeError:  # ignore unknown keycodes
     result = Key.None
 
-
-# Required for Nim 18.0 workarounds, remove when 18.1 is out
-template isNimPre0_18_1: bool =
-  NimMajor <= 0 and NimMinor <= 18 and NimPatch <= 0
 
 var gFullscreen = false
 
@@ -242,7 +238,7 @@ when defined(windows):
   proc consoleInit() = discard
   proc consoleDeinit() = discard
 
-  proc getKeyAsync(): Key =
+  func getKeyAsync(): Key =
     var key = Key.None
 
     if kbhit() > 0:
@@ -333,10 +329,7 @@ else:  # OS X & Linux
 
   proc kbhit(): cint =
     var tv: Timeval
-    when isNimPre0_18_1:
-      tv.tv_sec = 0
-    else:
-      tv.tv_sec = Time(0)
+    tv.tv_sec = Time(0)
     tv.tv_usec = 0
 
     var fds: TFdSet
@@ -566,10 +559,10 @@ proc newTerminalBuffer*(width, height: Natural): TerminalBuffer =
   tb.clear()
   result = tb
 
-proc width*(tb: TerminalBuffer): Natural =
+func width*(tb: TerminalBuffer): Natural =
   result = tb.width
 
-proc height*(tb: TerminalBuffer): Natural =
+func height*(tb: TerminalBuffer): Natural =
   result = tb.height
 
 proc copyFrom*(tb: var TerminalBuffer,
@@ -621,22 +614,22 @@ proc setForegroundColor*(tb: var TerminalBuffer, fg: ForegroundColor,
 proc setStyle*(tb: var TerminalBuffer, style: set[Style]) =
   tb.currStyle = style
 
-proc getCursorPos*(tb: TerminalBuffer): tuple[x: Natural, y: Natural] =
+func getCursorPos*(tb: TerminalBuffer): tuple[x: Natural, y: Natural] =
   result = (tb.currX, tb.currY)
 
-proc getCursorXPos*(tb: TerminalBuffer): Natural =
+func getCursorXPos*(tb: TerminalBuffer): Natural =
   result = tb.currX
 
-proc getCursorYPos*(tb: TerminalBuffer): Natural =
+func getCursorYPos*(tb: TerminalBuffer): Natural =
   result = tb.currY
 
-proc getBackgroundColor*(tb: var TerminalBuffer): BackgroundColor =
+func getBackgroundColor*(tb: var TerminalBuffer): BackgroundColor =
   result = tb.currBg
 
-proc getForegroundColor*(tb: var TerminalBuffer): ForegroundColor =
+func getForegroundColor*(tb: var TerminalBuffer): ForegroundColor =
   result = tb.currFg
 
-proc getStyle*(tb: var TerminalBuffer): set[Style] =
+func getStyle*(tb: var TerminalBuffer): set[Style] =
   result = tb.currStyle
 
 proc resetAttributes*(tb: var TerminalBuffer) =
@@ -693,16 +686,10 @@ proc setAttribs(c: TerminalChar) =
       setStyle(gCurrStyle)
 
 proc setPos(x, y: Natural) =
-  when isNimPre0_18_1() and defined(posix):
-    terminal.setCursorPos(x+1, y+1)
-  else:
-    terminal.setCursorPos(x, y)
+  terminal.setCursorPos(x, y)
 
 proc setXPos(x: Natural) =
-  when isNimPre0_18_1() and defined(posix):
-    terminal.setCursorXPos(x+1)
-  else:
-    terminal.setCursorXPos(x)
+  terminal.setCursorXPos(x)
 
 
 proc displayFull(tb: TerminalBuffer) =
@@ -886,17 +873,17 @@ proc newBoxBuffer*(width, height: Natural): BoxBuffer =
   result.height = height
   newSeq(result.buf, width * height)
 
-proc width*(bb: BoxBuffer): Natural =
+func width*(bb: BoxBuffer): Natural =
   result = bb.width
 
-proc height*(bb: BoxBuffer): Natural =
+func height*(bb: BoxBuffer): Natural =
   result = bb.height
 
 proc `[]=`*(b: var BoxBuffer, x, y: Natural, c: BoxChar) =
   if x < b.width and y < b.height:
     b.buf[b.width * y + x] = c
 
-proc `[]`*(b: BoxBuffer, x, y: Natural): BoxChar =
+func `[]`*(b: BoxBuffer, x, y: Natural): BoxChar =
   if x < b.width and y < b.height:
     result = b.buf[b.width * y + x]
 
