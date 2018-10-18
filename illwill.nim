@@ -1,15 +1,17 @@
+## :Authors: John Novak
+##
 ## This is a ``curses`` inspired simple terminal library that aims to make
-## writing cross-platform text mode applications easier. The main features are
-## as follows:
+## writing cross-platform text mode applications easier. The main features are:
 ##
 ## * Non-blocking keyboard input
 ## * Support for key combinations and special keys available both in the
 ##   standard Windows Console (``cmd.exe``) and most common POSIX terminals
 ## * Virtual terminal buffers with double-buffering support (only
 ##   display changes from the previous frame and minimise the number of
-##   attribute changes)
-## * Simple graphics using UTF-8 box drawing characters
-## * Full-screen support (restore the contents of the terminal after exit)
+##   attribute changes to reduce CPU usage)
+## * Simple graphics using UTF-8 box drawing symbols
+## * Full-screen support with restoring the contents of the terminal after
+##   exit
 ##
 ## The module depends only on the standard `terminal` module. However, you
 ## should not use any `terminal` functions directly, neither should you use
@@ -344,10 +346,10 @@ else:  # OS X & Linux
 
   # surely a 100 char buffer is more than enough; the longest
   # keycode sequence I've seen was 6 chars
-  const KEY_SEQUENCE_MAXLEN = 100
+  const KeySequenceMaxLen = 100
 
   # global keycode buffer
-  var keyBuf: array[KEY_SEQUENCE_MAXLEN, int]
+  var keyBuf: array[KeySequenceMaxLen, int]
 
   let
     keySequences = {
@@ -405,7 +407,7 @@ else:  # OS X & Linux
 
   proc getKeyAsync(): Key =
     var i = 0
-    while kbhit() > 0 and i < KEY_SEQUENCE_MAXLEN:
+    while kbhit() > 0 and i < KeySequenceMaxLen:
       var ret = read(0, keyBuf[i].addr, 1)
       if ret > 0:
         i += 1
@@ -420,16 +422,16 @@ else:  # OS X & Linux
 
 
 const
-  XTERM_COLOR    = "xterm-color"
-  XTERM_256COLOR = "xterm-256color"
+  XtermColor    = "xterm-color"
+  Xterm256Color = "xterm-256color"
 
 proc enterFullscreen() =
   ## Enters full screen mode (clears the terminal).
   when defined(posix):
     case getEnv("TERM"):
-    of XTERM_COLOR:
+    of XtermColor:
       stdout.write "\e7\e[?47h"
-    of XTERM_256COLOR:
+    of Xterm256Color:
       stdout.write "\e[?1049h"
     else:
       eraseScreen()
@@ -440,9 +442,9 @@ proc exitFullscreen() =
   ## Exits full screen mode (restores the previous contents of the terminal).
   when defined(posix):
     case getEnv("TERM"):
-    of XTERM_COLOR:
+    of XtermColor:
       stdout.write "\e[2J\e[?47l\e8"
-    of XTERM_256COLOR:
+    of Xterm256Color:
       stdout.write "\e[?1049l"
     else:
       eraseScreen()
@@ -450,16 +452,16 @@ proc exitFullscreen() =
     eraseScreen()
 
 proc illwillInit*(fullscreen: bool = true) =
-  ## Initializes the terminal and enabled non-blocking keyboard input. `Needs
-  ## to be called before doing anything with the library!`
+  ## Initializes the terminal and enabled non-blocking keyboard input. Needs
+  ## to be called before doing anything with the library.
   gFullscreen = fullscreen
   if gFullscreen: enterFullscreen()
   consoleInit()
   resetAttributes()
 
 proc illwillDeinit*() =
-  ## Resets the terminal to its previous state. `Needs to be called before
-  ## exit!`
+  ## Resets the terminal to its previous state. Needs to be called before
+  ## exiting the application.
   if gFullscreen: exitFullscreen()
   consoleDeinit()
   resetAttributes()
@@ -475,6 +477,11 @@ type
   TerminalChar* = object
     ## Represents a character in the terminal buffer, including color and
     ## style information.
+    ##
+    ## If `forceWrite` is set to true, the character is always output even
+    ## when double buffering is enabled (this is a hack to achieve better
+    ## continuity of horizontal lines when using box drawing UTF-8 symbols in
+    ## the Windows Console).
     ch*: Rune
     fg*: ForegroundColor
     bg*: BackgroundColor
@@ -485,9 +492,8 @@ type
     ## A virtual terminal buffer of a fixed width and height. It remembers the
     ## current color and style settings and the current cursor position.
     ##
-    ## Write to the terminal buffer with the ``TerminalBuffer.write()``
-    ## function or you can read and write characters directly using the index
-    ## operators:
+    ## Write to the terminal buffer with ``TerminalBuffer.write()`` or you can
+    ## access the character buffer directly with the index operators:
     ##
     ## .. code-block::
     ##   # Create a new terminal buffer
@@ -519,15 +525,21 @@ type
     currY: Natural
 
 proc `[]=`*(tb: var TerminalBuffer, x, y: Natural, ch: TerminalChar) =
+  ## Index operator to write a character into the terminal buffer at the
+  ## specified location.
   if x < tb.width and y < tb.height:
     tb.buf[tb.width * y + x] = ch
 
 proc `[]`*(tb: TerminalBuffer, x, y: Natural): TerminalChar =
+  ## Index operator to read a character from the terminal buffer at the
+  ## specified location.
   if x < tb.width and y < tb.height:
     result = tb.buf[tb.width * y + x]
 
 
 proc fill*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural, ch: string = " ") =
+  ## Fills a rectangular areas with the `ch` character, using the current text
+  ## attributes.
   if x1 < tb.width and y1 < tb.height:
     let
       c = TerminalChar(ch: ch.runeAt(0), fg: tb.currFg, bg: tb.currBg,
@@ -542,10 +554,13 @@ proc fill*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural, ch: string = " ") =
 
 
 proc clear*(tb: var TerminalBuffer, ch: string = " ") =
+  ## Clears the contents of the terminal buffer with the `ch` character, using
+  ## the ``fgNone`` and ``bgNone`` attributes.
   let c = TerminalChar(ch: ch.runeAt(0), fg: fgNone, bg: bgNone, style: {})
   tb.fill(0, 0, tb.width-1, tb.height-1, ch)
 
 proc initTerminalBuffer(tb: var TerminalBuffer, width, height: Natural) =
+  ## Initializes a new terminal buffer object of a fixed width and height.
   tb.width = width
   tb.height = height
   newSeq(tb.buf, width * height)
@@ -554,20 +569,32 @@ proc initTerminalBuffer(tb: var TerminalBuffer, width, height: Natural) =
   tb.currStyle = {}
 
 proc newTerminalBuffer*(width, height: Natural): TerminalBuffer =
+  ## Creates a new terminal buffer of a fixed width and height.
   var tb = new TerminalBuffer
   tb.initTerminalBuffer(width, height)
   tb.clear()
   result = tb
 
 func width*(tb: TerminalBuffer): Natural =
+  ## Returns the width of the terminal buffer.
   result = tb.width
 
 func height*(tb: TerminalBuffer): Natural =
+  ## Returns the height of the terminal buffer.
   result = tb.height
 
 proc copyFrom*(tb: var TerminalBuffer,
                src: TerminalBuffer, srcX, srcY, width, height: Natural,
                destX, destY: Natural) =
+  ## Copies the contents of the `src` terminal buffer into this one.
+  ## A rectangular area of dimension `width` and `height` is copied from
+  ## the position `srcX` and `srcY` in the source buffer to the position
+  ## `destX` and `destY` in this buffer.
+  ##
+  ## If the extents of the area to be copied lie outside the extents of the
+  ## buffers, the copied area will be clipped to the available area (in other
+  ## words, the call can never fail; in the worst case it just copies
+  ## nothing).
   let
     srcWidth = max(src.width - srcX, 0)
     srcHeight = max(src.height - srcY, 0)
@@ -582,29 +609,40 @@ proc copyFrom*(tb: var TerminalBuffer,
 
 
 proc copyFrom*(tb: var TerminalBuffer, src: TerminalBuffer) =
+  ## Copies the full contents of the `src` terminal buffer into this one.
+  ##
+  ## If the extents of the source buffer is greater than the extents of the
+  ## destination buffer, the copied area is clipped to the destination area.
   tb.copyFrom(src, 0, 0, src.width, src.height, 0, 0)
 
 proc newTerminalBufferFrom*(src: TerminalBuffer): TerminalBuffer =
+  ## Creates a new terminal buffer with the dimensions of the `src` buffer and
+  ## copies its contents into the new buffer.
   var tb = new TerminalBuffer
   tb.initTerminalBuffer(src.width, src.height)
   tb.copyFrom(src)
   result = tb
 
 proc setCursorPos*(tb: var TerminalBuffer, x, y: Natural) =
+  ## Sets the current cursor position.
   tb.currX = x
   tb.currY = y
 
 proc setCursorXPos*(tb: var TerminalBuffer, x: Natural) =
+  ## Sets the current x cursor position.
   tb.currX = x
 
 proc setCursorYPos*(tb: var TerminalBuffer, y: Natural) =
+  ## Sets the current y cursor position.
   tb.currY = y
 
 proc setBackgroundColor*(tb: var TerminalBuffer, bg: BackgroundColor) =
+  ## Sets the current background color.
   tb.currBg = bg
 
 proc setForegroundColor*(tb: var TerminalBuffer, fg: ForegroundColor,
                          bright: bool = false) =
+  ## Sets the current foreground color and the bright style flag.
   if bright:
     incl(tb.currStyle, styleBright)
   else:
@@ -612,36 +650,45 @@ proc setForegroundColor*(tb: var TerminalBuffer, fg: ForegroundColor,
   tb.currFg = fg
 
 proc setStyle*(tb: var TerminalBuffer, style: set[Style]) =
+  ## Sets the current style flags.
   tb.currStyle = style
 
 func getCursorPos*(tb: TerminalBuffer): tuple[x: Natural, y: Natural] =
+  ## Returns the current cursor position.
   result = (tb.currX, tb.currY)
 
 func getCursorXPos*(tb: TerminalBuffer): Natural =
+  ## Returns the current x cursor position.
   result = tb.currX
 
 func getCursorYPos*(tb: TerminalBuffer): Natural =
+  ## Returns the current y cursor position.
   result = tb.currY
 
 func getBackgroundColor*(tb: var TerminalBuffer): BackgroundColor =
+  ## Returns the current background color.
   result = tb.currBg
 
 func getForegroundColor*(tb: var TerminalBuffer): ForegroundColor =
+  ## Returns the current foreground color.
   result = tb.currFg
 
 func getStyle*(tb: var TerminalBuffer): set[Style] =
+  ## Returns the current style flags.
   result = tb.currStyle
 
 proc resetAttributes*(tb: var TerminalBuffer) =
+  ## Resets the current text attributes to ``bgNone``, ``fgWhite`` and clears
+  ## all the style flags.
   tb.setBackgroundColor(bgNone)
   tb.setForegroundColor(fgWhite)
   tb.setStyle({})
 
 proc write*(tb: var TerminalBuffer, x, y: Natural, s: string) =
-  ## Write a string into the buffer starting at the specified position using
-  ## the current attributes. Lines do not wrap and attempting to write outside
-  ## the extents of the buffer will not raise an error; the string will be
-  ## simply cropped to the visible area.
+  ## Writes a string into the terminal buffer at the specified position using
+  ## the current text attributes. Lines do not wrap and attempting to write
+  ## outside the extents of the buffer will not raise an error; the output
+  ## will be cropped to the visible area.
 
   var currX = x
   for ch in runes(s):
@@ -751,10 +798,12 @@ proc displayDiff(tb: TerminalBuffer) =
 var gDoubleBufferingEnabled = true
 
 proc setDoubleBuffering*(enabled: bool) =
+  ## Enables or disables double buffering (enabled by default).
   gDoubleBufferingEnabled = enabled
   gPrevTerminalBuffer = nil
 
 proc display*(tb: TerminalBuffer) =
+  ## Outputs the contents of the terminal buffer to the screen.
   if gDoubleBufferingEnabled:
     if gPrevTerminalBuffer == nil:
       displayFull(tb)
@@ -774,7 +823,7 @@ proc display*(tb: TerminalBuffer) =
 
 
 type
-  BoxChar* = int
+  BoxChar = int
 
 const
   LEFT   = 0x01
@@ -860,30 +909,38 @@ gBoxCharsUnicode[H_DBL or V_DBL or DOWN or UP or RIGHT or    0] = "╠"
 gBoxCharsUnicode[H_DBL or V_DBL or DOWN or UP or RIGHT or LEFT] = "╬"
 
 
-proc toUTF8String*(c: BoxChar): string = gBoxCharsUnicode[c]
+proc toUTF8String(c: BoxChar): string = gBoxCharsUnicode[c]
 
 type BoxBuffer* = ref object
+  ## Box buffers are used to store the results of multiple consecutive box
+  ## drawing calls. The idea is that when you draw a series of lines and
+  ## rectangles into the buffer, the overlapping lines will get automatically
+  ## connected by placing the appropriate UTF-8 symbols at the corner and
+  ## junction points. The results can then be written to a terminal buffer.
   width: Natural
   height: Natural
   buf: seq[BoxChar]
 
 proc newBoxBuffer*(width, height: Natural): BoxBuffer =
+  ## Creates a new box buffer of a fixed width and height.
   result = new BoxBuffer
   result.width = width
   result.height = height
   newSeq(result.buf, width * height)
 
 func width*(bb: BoxBuffer): Natural =
+  ## Returns the width of the box buffer.
   result = bb.width
 
 func height*(bb: BoxBuffer): Natural =
+  ## Returns the height of the box buffer.
   result = bb.height
 
-proc `[]=`*(b: var BoxBuffer, x, y: Natural, c: BoxChar) =
+proc `[]=`(b: var BoxBuffer, x, y: Natural, c: BoxChar) =
   if x < b.width and y < b.height:
     b.buf[b.width * y + x] = c
 
-func `[]`*(b: BoxBuffer, x, y: Natural): BoxChar =
+func `[]`(b: BoxBuffer, x, y: Natural): BoxChar =
   if x < b.width and y < b.height:
     result = b.buf[b.width * y + x]
 
@@ -891,6 +948,15 @@ func `[]`*(b: BoxBuffer, x, y: Natural): BoxChar =
 proc copyFrom*(bb: var BoxBuffer,
                src: BoxBuffer, srcX, srcY, width, height: Natural,
                destX, destY: Natural) =
+  ## Copies the contents of the `src` box buffer into this one.
+  ## A rectangular area of dimension `width` and `height` is copied from
+  ## the position `srcX` and `srcY` in the source buffer to the position
+  ## `destX` and `destY` in this buffer.
+  ##
+  ## If the extents of the area to be copied lie outside the extents of the
+  ## buffers, the copied area will be clipped to the available area (in other
+  ## words, the call can never fail; in the worst case it just copies
+  ## nothing).
   let
     srcWidth = max(src.width - srcX, 0)
     srcHeight = max(src.height - srcY, 0)
@@ -905,15 +971,23 @@ proc copyFrom*(bb: var BoxBuffer,
 
 
 proc copyFrom*(bb: var BoxBuffer, src: BoxBuffer) =
+  ## Copies the full contents of the `src` box buffer into this one.
+  ##
+  ## If the extents of the source buffer is greater than the extents of the
+  ## destination buffer, the copied area is clipped to the destination area.
   bb.copyFrom(src, 0, 0, src.width, src.height, 0, 0)
 
 proc newBoxBufferFrom*(src: BoxBuffer): BoxBuffer =
+  ## Creates a new box buffer with the dimensions of the `src` buffer and
+  ## copies its contents into the new buffer.
   var bb = new BoxBuffer
   bb.copyFrom(src)
   result = bb
 
 proc drawHorizLine*(b: var BoxBuffer, x1, x2, y: Natural,
                     doubleStyle: bool = false) =
+  ## Draws a horizontal line into the box buffer. Set `doubleStyle` to true
+  ## to draw double lines.
   if y < b.height:
     var xStart = x1
     var xEnd = x2
@@ -936,6 +1010,8 @@ proc drawHorizLine*(b: var BoxBuffer, x1, x2, y: Natural,
 
 proc drawVertLine*(b: var BoxBuffer, x, y1, y2: Natural,
                    doubleStyle: bool = false) =
+  ## Draws a vertical line into the box buffer. Set `doubleStyle` to true
+  ## to draw double lines.
   if x < b.width:
     var yStart = y1
     var yEnd = y2
@@ -958,6 +1034,8 @@ proc drawVertLine*(b: var BoxBuffer, x, y1, y2: Natural,
 
 proc drawRect*(b: var BoxBuffer, x1, y1, x2, y2: Natural,
                doubleStyle: bool = false) =
+  ## Draws a rectangle into the box buffer. Set `doubleStyle` to true to draw
+  ## double lines.
   b.drawHorizLine(x1, x2, y1, doubleStyle)
   b.drawHorizLine(x1, x2, y2, doubleStyle)
   b.drawVertLine(x1, y1, y2, doubleStyle)
@@ -965,6 +1043,8 @@ proc drawRect*(b: var BoxBuffer, x1, y1, x2, y2: Natural,
 
 
 proc write*(tb: var TerminalBuffer, b: var BoxBuffer) =
+  ## Writes the contents of the box buffer into this terminal buffer with
+  ## the current text attributes.
   let width = min(tb.width, b.width)
   let height = min(tb.height, b.height)
   var horizBoxCharCount: int
@@ -996,18 +1076,23 @@ proc write*(tb: var TerminalBuffer, b: var BoxBuffer) =
 
 proc drawHorizLine*(tb: var TerminalBuffer, x1, x2, y: Natural,
                     doubleStyle: bool = false) =
+  ## Convenience method to draw a single horizontal line into a terminal
+  ## buffer directly.
   var bb = newBoxBuffer(tb.width, tb.height)
   bb.drawHorizLine(x1, x2, y, doubleStyle)
   tb.write(bb)
 
 proc drawVertLine*(tb: var TerminalBuffer, x, y1, y2: Natural,
                    doubleStyle: bool = false) =
+  ## Convenience method to draw a single vertical line into a terminal buffer
+  ## directly.
   var bb = newBoxBuffer(tb.width, tb.height)
   bb.drawVertLine(x, y1, y2, doubleStyle)
   tb.write(bb)
 
 proc drawRect*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural,
                doubleStyle: bool = false) =
+  ## Convenience method to draw a rectangle into a terminal buffer directly.
   var bb = newBoxBuffer(tb.width, tb.height)
   bb.drawRect(x1, y1, x2, y2, doubleStyle)
   tb.write(bb)
