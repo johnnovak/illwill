@@ -230,6 +230,7 @@ func toKey(c: int): Key =
 
 
 var gFullscreen = false
+var gFullRedrawNextFrame = false
 
 when defined(windows):
   import encodings, unicode, winlean
@@ -308,6 +309,85 @@ when defined(windows):
 else:  # OS X & Linux
   import posix, tables, termios
 
+#[
+  # From:
+  # http://man7.org/tlpi/code/online/dist/pgsjc/handling_SIGTSTP.c.html
+
+  proc tstpHandler(sig: cint) {.noconv.} =
+    var
+      tstpMask: Sigset
+      prevMask: Sigset
+      sa: Sigaction
+
+    # Set handling to default
+    signal(SIGTSTP, SIG_DFL)
+
+    # Generate a further SIGTSTP
+    discard posix.raise(SIGTSTP)
+
+    # Unblock SIGTSTP; the pending SIGTSTP immediately suspends the program
+    discard sigemptyset(tstpMask)
+    discard sigaddset(tstpMask, SIGTSTP)
+
+    if sigprocmask(SIG_UNBLOCK, tstpMask, prevMask) == -1:
+      quit(1)
+
+    consoleDeinit()
+    # Execution resumes here after SIGCONT
+    gFullRedrawNextFrame = true
+    consoleInit()
+
+    # Reblock SIGTSTP
+    if sigprocmask(SIG_SETMASK, prevMask, cast[var Sigset](nil)) == -1:
+      quit(1)
+
+    # Reestablish handler
+    discard sigemptyset(sa.sa_mask)
+    sa.sa_flags = SA_RESTART
+    sa.sa_handler = tstpHandler
+    if sigaction(SIGTSTP, sa, nil) == -1:
+      quit(1)
+
+  # Init
+  var sa: Sigaction
+
+  if sigaction(SIGTSTP, cast[var Sigaction](nil), sa) == -1:
+    quit(1)
+
+  if sa.sa_handler != SIG_IGN:
+    discard sigemptyset(sa.sa_mask)
+    sa.sa_flags = SA_RESTART
+    sa.sa_handler = tstpHandler
+    if sigaction(SIGTSTP, sa, nil) == -1:
+      quit(1)
+#]#
+
+  proc consoleInit()
+  proc consoleDeinit()
+
+  # Adapted from:
+  # https://ftp.gnu.org/old-gnu/Manuals/glibc-2.2.3/html_chapter/libc_24.html#SEC499
+  proc SIGTSTP_handler(sig: cint) {.noconv.} =
+    signal(SIGTSTP, SIG_DFL)
+    # XXX why don't the below 3 lines seem to have any effect?
+    resetAttributes()
+    showCursor()
+    consoleDeinit()
+    discard posix.raise(SIGTSTP)
+
+  proc SIGCONT_handler(sig: cint) {.noconv.} =
+    signal(SIGCONT, SIGCONT_handler)
+    signal(SIGTSTP, SIGTSTP_handler)
+
+    gFullRedrawNextFrame = true
+    consoleInit()
+    hideCursor()
+
+  proc installSignalHandlers() =
+    signal(SIGCONT, SIGCONT_handler)
+    signal(SIGTSTP, SIGTSTP_handler)
+
+
   proc nonblock(enabled: bool) =
     var ttyState: Termios
 
@@ -341,8 +421,12 @@ else:  # OS X & Linux
     return FD_ISSET(STDIN_FILENO, fds)
 
 
-  proc consoleInit() = nonblock(true)
-  proc consoleDeinit() = nonblock(false)
+  proc consoleInit() =
+    nonblock(true)
+    installSignalHandlers()
+
+  proc consoleDeinit() =
+    nonblock(false)
 
   # surely a 100 char buffer is more than enough; the longest
   # keycode sequence I've seen was 6 chars
@@ -804,7 +888,7 @@ proc setDoubleBuffering*(enabled: bool) =
 
 proc display*(tb: TerminalBuffer) =
   ## Outputs the contents of the terminal buffer to the screen.
-  if gDoubleBufferingEnabled:
+  if not gFullRedrawNextFrame and gDoubleBufferingEnabled:
     if gPrevTerminalBuffer == nil:
       displayFull(tb)
       gPrevTerminalBuffer = newTerminalBufferFrom(tb)
@@ -820,6 +904,7 @@ proc display*(tb: TerminalBuffer) =
   else:
     displayFull(tb)
     flushFile(stdout)
+    gFullRedrawNextFrame = false
 
 
 type
