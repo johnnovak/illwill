@@ -19,8 +19,8 @@ proc updateScreen(tb: var TerminalBuffer) =
     y2 = max(tb.height-2, y1)
     fillChars = "|/-\\"
 
-  let t = cpuTime()
-  let ch = fillChars[(fmod(t * 10, fillChars.len.float)).int]
+  let t = epochTime()
+  let ch = fillChars[(fmod(t * 5, fillChars.len.float)).int]
 
   tb.setForegroundColor(fgBlack, bright=true)
   tb.fill(x1,y1, x2, y2, $ch)
@@ -65,7 +65,7 @@ proc main() =
     tb.updateScreen()
     tb.display()
 
-    sleep(20)
+    sleep(50)
 
 main()
 
