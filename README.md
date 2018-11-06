@@ -11,10 +11,13 @@ nimble install illwill
 
 ```nimrod
 import illwill
+import os
 
 illwillInit(fullscreen=true)
 
-var cb = newConsoleBuffer(terminalWidth(), terminalHeight())
+var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
+tb.display()
+echo "Press Q, Esc or Ctrl-C to quit"
 
 while true:
   var key = getKey()
