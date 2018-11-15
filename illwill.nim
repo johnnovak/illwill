@@ -238,8 +238,30 @@ when defined(windows):
   proc kbhit(): cint {.importc: "_kbhit", header: "<conio.h>".}
   proc getch(): cint {.importc: "_getch", header: "<conio.h>".}
 
-  proc consoleInit() = discard
-  proc consoleDeinit() = discard
+
+  proc getConsoleMode(hConsoleHandle: Handle, dwMode: ptr DWORD): WINBOOL {.
+      stdcall, dynlib: "kernel32", importc: "GetConsoleMode".}
+
+  proc setConsoleMode(hConsoleHandle: Handle, dwMode: DWORD): WINBOOL {.
+      stdcall, dynlib: "kernel32", importc: "SetConsoleMode".}
+
+  const
+    ENABLE_WRAP_AT_EOL_OUTPUT   = 0x0002
+    DISABLE_NEWLINE_AUTO_RETURN = 0x0008
+
+  var gOldConsoleMode: DWORD
+
+  proc consoleInit() =
+    if gFullscreen:
+      var mode: DWORD
+      if getConsoleMode(getStdHandle(STD_OUTPUT_HANDLE),
+                        addr(gOldConsoleMode)) != 0:
+        var mode = gOldConsoleMode and (not ENABLE_WRAP_AT_EOL_OUTPUT)
+        discard setConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), mode)
+
+  proc consoleDeinit() =
+    discard setConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), gOldConsoleMode)
+
 
   func getKeyAsync(): Key =
     var key = Key.None
@@ -308,59 +330,6 @@ when defined(windows):
 
 else:  # OS X & Linux
   import posix, tables, termios
-
-#[
-  # From:
-  # http://man7.org/tlpi/code/online/dist/pgsjc/handling_SIGTSTP.c.html
-
-  proc tstpHandler(sig: cint) {.noconv.} =
-    var
-      tstpMask: Sigset
-      prevMask: Sigset
-      sa: Sigaction
-
-    # Set handling to default
-    signal(SIGTSTP, SIG_DFL)
-
-    # Generate a further SIGTSTP
-    discard posix.raise(SIGTSTP)
-
-    # Unblock SIGTSTP; the pending SIGTSTP immediately suspends the program
-    discard sigemptyset(tstpMask)
-    discard sigaddset(tstpMask, SIGTSTP)
-
-    if sigprocmask(SIG_UNBLOCK, tstpMask, prevMask) == -1:
-      quit(1)
-
-    consoleDeinit()
-    # Execution resumes here after SIGCONT
-    gFullRedrawNextFrame = true
-    consoleInit()
-
-    # Reblock SIGTSTP
-    if sigprocmask(SIG_SETMASK, prevMask, cast[var Sigset](nil)) == -1:
-      quit(1)
-
-    # Reestablish handler
-    discard sigemptyset(sa.sa_mask)
-    sa.sa_flags = SA_RESTART
-    sa.sa_handler = tstpHandler
-    if sigaction(SIGTSTP, sa, nil) == -1:
-      quit(1)
-
-  # Init
-  var sa: Sigaction
-
-  if sigaction(SIGTSTP, cast[var Sigaction](nil), sa) == -1:
-    quit(1)
-
-  if sa.sa_handler != SIG_IGN:
-    discard sigemptyset(sa.sa_mask)
-    sa.sa_flags = SA_RESTART
-    sa.sa_handler = tstpHandler
-    if sigaction(SIGTSTP, sa, nil) == -1:
-      quit(1)
-#]#
 
   proc consoleInit()
   proc consoleDeinit()
@@ -534,6 +503,7 @@ proc exitFullscreen() =
       eraseScreen()
   else:
     eraseScreen()
+    setCursorPos(0, 0)
 
 proc illwillInit*(fullscreen: bool = true) =
   ## Initializes the terminal and enabled non-blocking keyboard input. Needs
@@ -885,6 +855,10 @@ proc setDoubleBuffering*(enabled: bool) =
   ## Enables or disables double buffering (enabled by default).
   gDoubleBufferingEnabled = enabled
   gPrevTerminalBuffer = nil
+
+proc hasDoubleBuffering*(): bool =
+  ## Returns true if double buffering is enabled.
+  result = gDoubleBufferingEnabled
 
 proc display*(tb: TerminalBuffer) =
   ## Outputs the contents of the terminal buffer to the screen.
