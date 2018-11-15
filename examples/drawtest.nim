@@ -1,7 +1,7 @@
 # Full-screen example to demonstrate the box drawing functionality
 
+import os, strformat
 import illwill
-import math, os, strformat, times
 
 
 proc exitProc() {.noconv.} =

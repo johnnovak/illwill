@@ -1,8 +1,8 @@
 # Simple example that prints out the size of the terminal window and
-# demonstrates the basic structure of a full-screen app
+# demonstrates the basic structure of a full-screen app.
 
+import os, strformat
 import illwill
-import math, os, strformat, times
 
 
 proc exitProc() {.noconv.} =
@@ -33,9 +33,6 @@ proc main() =
     tb.resetAttributes()
     tb.write(1, 4, "Press Q, Esc or Ctrl-C to quit")
     tb.write(1, 5, "Resize the terminal window and see what happens :)")
-
-    tb.setForegroundColor(fgGreen)
-    tb.drawRect(4, 7, 15, 9, doubleStyle=true)
 
     tb.display()
 
