@@ -10,3 +10,17 @@ skipDirs = @["examples", "tests"]
 # Dependencies
 
 requires "nim >= 0.18.0"
+
+task examples, "Compiles the examples":
+  exec "nim c -d:release examples/boxdrawing.nim"
+  exec "nim c -d:release examples/drawtest.nim"
+  exec "nim c -d:release examples/fullscreen.nim"
+  exec "nim c -d:release examples/keycodes.nim"
+  exec "nim c -d:release examples/simplekeycodes.nim"
+
+task examplesDebug, "Compiles the examples (debug mode)":
+  exec "nim c examples/boxdrawing.nim"
+  exec "nim c examples/drawtest.nim"
+  exec "nim c examples/fullscreen.nim"
+  exec "nim c examples/keycodes.nim"
+  exec "nim c examples/simplekeycodes.nim"

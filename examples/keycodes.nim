@@ -7,6 +7,7 @@ import illwill
 
 proc exitProc() {.noconv.} =
   illwillDeinit()
+  showCursor()
   quit(0)
 
 var gLastKeyPressed = Key.None
@@ -59,7 +60,7 @@ proc main() =
     var key = getKey()
     case key
     of Key.None: discard
-    of Key.Escape, Key.Q: exitProc(); break
+    of Key.Escape, Key.Q: exitProc()
     else: gLastKeyPressed = key
 
     tb.updateScreen()

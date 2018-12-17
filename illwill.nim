@@ -1182,12 +1182,10 @@ template writeProcessArg(tb: var TerminalBuffer, style: Style) =
 template writeProcessArg(tb: var TerminalBuffer, style: set[Style]) =
   tb.setStyle(style)
 
-template writeProcessArg(tb: var TerminalBuffer,
-                               color: ForegroundColor) =
+template writeProcessArg(tb: var TerminalBuffer, color: ForegroundColor) =
   tb.setForegroundColor(color)
 
-template writeProcessArg(tb: var TerminalBuffer,
-                               color: BackgroundColor) =
+template writeProcessArg(tb: var TerminalBuffer, color: BackgroundColor) =
   tb.setBackgroundColor(color)
 
 template writeProcessArg(tb: var TerminalBuffer, cmd: TerminalCmd) =

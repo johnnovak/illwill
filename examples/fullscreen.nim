@@ -7,6 +7,7 @@ import illwill
 
 proc exitProc() {.noconv.} =
   illwillDeinit()
+  showCursor()
   quit(0)
 
 proc main() =
@@ -19,7 +20,7 @@ proc main() =
 
     var key = getKey()
     case key
-    of Key.Escape, Key.Q: exitProc(); break
+    of Key.Escape, Key.Q: exitProc()
     else: discard
 
     tb.setForegroundColor(fgYellow)

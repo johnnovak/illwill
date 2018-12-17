@@ -6,6 +6,7 @@ import illwill
 
 proc exitProc() {.noconv.} =
   illwillDeinit()
+  showCursor()
   quit(0)
 
 
@@ -101,7 +102,7 @@ proc main() =
       if gDrawMode == Draw: gDrawMode = Move
       else: gDrawMode = Draw
 
-    of Key.Q: exitProc(); break
+    of Key.Q: exitProc()
     else: discard
 
     tb.updateScreen()
