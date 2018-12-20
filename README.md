@@ -4,12 +4,10 @@
 
 **illwill** is a *(n)curses* inspired simple terminal library that aims to make
 writing cross-platform text mode applications easy. Having said that, it's
-*much* simpler than (n)curses and it's not as robust *by far* in terms of
+much simpler than (n)curses and it's not as robust by far in terms of
 supporting different encodings, terminal types etc. The aim was to write
 something small and simple in pure Nim that works for 99.99% of users without
 requiring any external dependencies or a terminfo database.
-
-![nimmod running on Windows](img/modplayer.png)
 
 For "serious" applications, the best is always to write different backends for
 *nix and Windows (one of the reasons being that the Windows Console is buffer
@@ -18,7 +16,7 @@ cross-platform programs and utilities where you need something more than the
 basic blocking console I/O but you don't actually want to bother with
 a full-blown GUI.
 
-Everybody likes lists, so here's the bullet point version:
+<img src="https://github.com/johnnovak/illwill/raw/master/img/modplayer.png" style="max-width: 50%; height: auto" alt="illwill in action" />
 
 **Use it if**
 
@@ -28,7 +26,7 @@ Everybody likes lists, so here's the bullet point version:
 * you don't need to support any fancy encodings and terminal types
 * you're developing a custom UI so you don't need any predefined widgets
 * you don't mind the [immediate mode UI](https://github.com/ocornut/imgui)
-  style/mindset
+  style/approach
 * you don't want any external dependencies
 
 **Don't use it if**

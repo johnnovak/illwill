@@ -5,7 +5,7 @@ author        = "John Novak"
 description   = "A curses inspired simple cross-platform console library for Nim"
 license       = "MIT"
 
-skipDirs = @["examples", "tests"]
+skipDirs = @["examples", "img"]
 
 # Dependencies
 
@@ -24,3 +24,7 @@ task examplesDebug, "Compiles the examples (debug mode)":
   exec "nim c examples/fullscreen.nim"
   exec "nim c examples/keycodes.nim"
   exec "nim c examples/simplekeycodes.nim"
+
+task gendoc, "Generate HTML documentation":
+  exec "nim doc -o:doc/illwill.html illwill"
+
