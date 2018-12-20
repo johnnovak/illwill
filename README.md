@@ -16,57 +16,48 @@ cross-platform programs and utilities where you need something more than the
 basic blocking console I/O but you don't actually want to bother with
 a full-blown GUI.
 
-<img src="https://github.com/johnnovak/illwill/raw/master/img/modplayer.png" style="max-width: 50%; height: auto" alt="illwill in action" />
-
-**Use it if**
-
-* you just want something simple that lets you write full-screen terminal
-  apps with non-blocking keyboard input that works on Windows, Mac OS X and
-  99.99% of modern Linux distributions
-* you don't need to support any fancy encodings and terminal types
-* you're developing a custom UI so you don't need any predefined widgets
-* you don't mind the [immediate mode UI](https://github.com/ocornut/imgui)
-  style/approach
-* you don't want any external dependencies
-
-**Don't use it if**
-
-* you need ultimate robustness in terms of supporting obscure terminals,
-  character encodings and Linux/Unix distributions
-* you need predefined widgets
-* you like complicating your life :)
-
-
 ### Main features
 
 * Non-blocking keyboard input.
-
 * Support for key combinations and special keys available both in the standard
   Windows Console (cmd.exe) and most common POSIX terminals.
-
 * Virtual terminal buffers with double-buffering support (only display changes
   from the previous frame and minimise the number of attribute changes to
   reduce CPU usage).
-
 * Simple graphics using UTF-8 box drawing symbols.
-
 * Full-screen support with restoring the contents of the terminal after exit.
+* Only depends on the standard terminal module.
 
-* The module depends only on the standard terminal module. However, you should
-  not use any terminal functions directly, neither should you use echo, write
-  or other similar functions for output. You should only use the interface
-  provided by the module to interact with the terminal.
+<img src="https://github.com/johnnovak/illwill/raw/master/img/nim-mod-1.png" align="left" width="48%" alt="illwill in action" />
+<img src="https://github.com/johnnovak/illwill/raw/master/img/nim-mod-2.png" width="48%" alt="illwill in action" />
 
-The following symbols are exported from the terminal module (these are safe to
-use):
+<p align="center"><em>
+<a href="https://github.com/johnnovak/nim-mod">nim-mod</a> is an oldschool MOD
+player that uses illwill for its awesome text-mode user interface</em></p>
 
-terminalWidth(), terminalHeight(), terminalSize(), hideCursor(), showCursor(),  Style
+
+### Use it if
+
+* You just want something simple that lets you write full-screen terminal
+  apps with non-blocking keyboard input that works on Windows, Mac OS X and
+  99.99% of modern Linux distributions.
+* You don't need to support any fancy encodings and terminal types.
+* You're developing a custom UI so you don't need any predefined widgets.
+* You don't mind the [immediate mode UI](https://github.com/ocornut/imgui)
+  style/approach.
+* You don't want any external dependencies.
+
+### Don't use it if
+
+* You need ultimate robustness in terms of supporting obscure terminals,
+  character encodings and Linux/Unix distributions.
+* You need predefined widgets.
+* You like complicating your life :sunglasses:
 
 ### Limitations
 
 * Suspend/resume (SIGTSTP/SIGCONT handling) works, but it doesn't properly
   reset the terminal when suspending the app.
-
 * The contents of the terminal is not restored after exiting the app on
   Windows in full-screen mode.
 
