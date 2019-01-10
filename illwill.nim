@@ -229,7 +229,7 @@ func toKey(c: int): Key =
     result = Key.None
 
 
-var gFullscreen = false
+var gFullScreen = false
 var gFullRedrawNextFrame = false
 
 when defined(windows):
@@ -252,7 +252,7 @@ when defined(windows):
   var gOldConsoleMode: DWORD
 
   proc consoleInit() =
-    if gFullscreen:
+    if gFullScreen:
       var mode: DWORD
       if getConsoleMode(getStdHandle(STD_OUTPUT_HANDLE),
                         addr(gOldConsoleMode)) != 0:
@@ -478,8 +478,8 @@ const
   XtermColor    = "xterm-color"
   Xterm256Color = "xterm-256color"
 
-proc enterFullscreen() =
-  ## Enters full screen mode (clears the terminal).
+proc enterFullScreen() =
+  ## Enters full-screen mode (clears the terminal).
   when defined(posix):
     case getEnv("TERM"):
     of XtermColor:
@@ -491,8 +491,8 @@ proc enterFullscreen() =
   else:
     eraseScreen()
 
-proc exitFullscreen() =
-  ## Exits full screen mode (restores the previous contents of the terminal).
+proc exitFullScreen() =
+  ## Exits full-screen mode (restores the previous contents of the terminal).
   when defined(posix):
     case getEnv("TERM"):
     of XtermColor:
@@ -505,18 +505,18 @@ proc exitFullscreen() =
     eraseScreen()
     setCursorPos(0, 0)
 
-proc illwillInit*(fullscreen: bool = true) =
-  ## Initializes the terminal and enabled non-blocking keyboard input. Needs
+proc illwillInit*(fullScreen: bool = true) =
+  ## Initializes the terminal and enables non-blocking keyboard input. Needs
   ## to be called before doing anything with the library.
-  gFullscreen = fullscreen
-  if gFullscreen: enterFullscreen()
+  gFullScreen = fullScreen
+  if gFullScreen: enterFullScreen()
   consoleInit()
   resetAttributes()
 
 proc illwillDeinit*() =
   ## Resets the terminal to its previous state. Needs to be called before
   ## exiting the application.
-  if gFullscreen: exitFullscreen()
+  if gFullScreen: exitFullScreen()
   consoleDeinit()
   resetAttributes()
   showCursor()
@@ -534,7 +534,7 @@ type
     ##
     ## If `forceWrite` is set to true, the character is always output even
     ## when double buffering is enabled (this is a hack to achieve better
-    ## continuity of horizontal lines when using box drawing UTF-8 symbols in
+    ## continuity of horizontal lines when using UTF-8 box drawing symbols in
     ## the Windows Console).
     ch*: Rune
     fg*: ForegroundColor
@@ -546,16 +546,18 @@ type
     ## A virtual terminal buffer of a fixed width and height. It remembers the
     ## current color and style settings and the current cursor position.
     ##
-    ## Write to the terminal buffer with ``TerminalBuffer.write()`` or you can
-    ## access the character buffer directly with the index operators:
+    ## Write to the terminal buffer with ``TerminalBuffer.write()`` or access
+    ## the character buffer directly with the index operators:
     ##
     ## .. code-block::
+    ##   import illwill, unicode
+    ##
     ##   # Create a new terminal buffer
     ##   var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
     ##
-    ##   # Write the character "X" to the top left of the terminal then read it back
-    ##   tb[0,0] = TerminalChar("X".runeAt(0), fgWhite, bgNone, style = {})
-    ##   let ch = tb[0,0]
+    ##   # Write the character "X" at position (5,5) then read it back
+    ##   tb[5,5] = TerminalChar(ch: "X".runeAt(0), fg: fgYellow, bg: bgNone, style: {})
+    ##   let ch = tb[5,5]
     ##
     ##   # Write "foo" at position (10,10) in bright red
     ##   tb.setForegroundColor(fgRed, bright=true)
@@ -566,7 +568,7 @@ type
     ##   # the current cursor position
     ##   tb.write(15, 12, "bar")
     ##
-    ##   # Output the contents of the buffer to the screen
+    ##   # Output the contents of the buffer to the terminal
     ##   tb.display()
     ##
     width: int
@@ -592,7 +594,7 @@ proc `[]`*(tb: TerminalBuffer, x, y: Natural): TerminalChar =
 
 
 proc fill*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural, ch: string = " ") =
-  ## Fills a rectangular areas with the `ch` character, using the current text
+  ## Fills a rectangular area with the `ch` character using the current text
   ## attributes.
   if x1 < tb.width and y1 < tb.height:
     let
@@ -608,7 +610,7 @@ proc fill*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural, ch: string = " ") =
 
 
 proc clear*(tb: var TerminalBuffer, ch: string = " ") =
-  ## Clears the contents of the terminal buffer with the `ch` character, using
+  ## Clears the contents of the terminal buffer with the `ch` character using
   ## the ``fgNone`` and ``bgNone`` attributes.
   let c = TerminalChar(ch: ch.runeAt(0), fg: fgNone, bg: bgNone, style: {})
   tb.fill(0, 0, tb.width-1, tb.height-1, ch)
@@ -733,7 +735,7 @@ func getStyle*(tb: var TerminalBuffer): set[Style] =
 
 proc resetAttributes*(tb: var TerminalBuffer) =
   ## Resets the current text attributes to ``bgNone``, ``fgWhite`` and clears
-  ## all the style flags.
+  ## all style flags.
   tb.setBackgroundColor(bgNone)
   tb.setForegroundColor(fgWhite)
   tb.setStyle({})
@@ -742,7 +744,7 @@ proc write*(tb: var TerminalBuffer, x, y: Natural, s: string) =
   ## Writes a string into the terminal buffer at the specified position using
   ## the current text attributes. Lines do not wrap and attempting to write
   ## outside the extents of the buffer will not raise an error; the output
-  ## will be cropped to the visible area.
+  ## will be just cropped to the extents of the buffer.
 
   var currX = x
   for ch in runes(s):
@@ -754,6 +756,8 @@ proc write*(tb: var TerminalBuffer, x, y: Natural, s: string) =
   tb.currY = y
 
 proc write*(tb: var TerminalBuffer, s: string) =
+  ## Writes a string into the terminal buffer at the current cursor position
+  ## using the current text attributes.
   write(tb, tb.currX, tb.currY, s)
 
 
@@ -861,7 +865,7 @@ proc hasDoubleBuffering*(): bool =
   result = gDoubleBufferingEnabled
 
 proc display*(tb: TerminalBuffer) =
-  ## Outputs the contents of the terminal buffer to the screen.
+  ## Outputs the contents of the terminal buffer to the actual terminal.
   if not gFullRedrawNextFrame and gDoubleBufferingEnabled:
     if gPrevTerminalBuffer == nil:
       displayFull(tb)

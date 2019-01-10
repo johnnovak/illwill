@@ -58,12 +58,13 @@ player that uses illwill for its awesome text-mode user interface</em></p>
 
 * Suspend/resume (SIGTSTP/SIGCONT handling) works, but it doesn't properly
   reset the terminal when suspending the app.
-* The contents of the terminal is not restored after exiting the app on
-  Windows in full-screen mode.
+* The contents of the terminal is not restored after exiting a full-screen app
+  on Windows.
 
 ## Installation
 
-The best way to install the library is by using `nimble`:
+The best way to install the library is by using
+[nimble](https://github.com/nim-lang/nimble):
 
 ```
 nimble install illwill
@@ -73,7 +74,7 @@ nimble install illwill
 
 This is a simple example on the general structure of a fullscreen terminal
 application. Check out the [examples](/examples) for more advanced use cases
-(e.g. using box drawing buffers, handling terminal resizes etc.).
+(e.g. using box drawing buffers, handling terminal resizes etc.)
 
 
 ```nimrod
@@ -117,7 +118,7 @@ while true:
   of Key.Escape, Key.Q: exitProc()
   else:
     cb.write(8, 4, ' '.repeat(31))
-    cb.write(2, 4, "Key pressed: ", fgGreen, $key)
+    cb.write(2, 4, resetStyle, "Key pressed: ", fgGreen, $key)
 
   cb.display()
   sleep(20)
