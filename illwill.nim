@@ -26,7 +26,7 @@
 ## ``hideCursor()``, ``showCursor()``, ``Style``
 ##
 
-import os, strformat, terminal, unicode
+import macros, os, strformat, terminal, unicode
 
 export terminal.terminalWidth
 export terminal.terminalHeight
@@ -230,7 +230,7 @@ func toKey(c: int): Key =
     result = Key.None
 
 
-var gFullscreen = false
+var gFullScreen = false
 var gFullRedrawNextFrame = false
 
 when defined(windows):
@@ -253,7 +253,7 @@ when defined(windows):
   var gOldConsoleMode: DWORD
 
   proc consoleInit() =
-    if gFullscreen:
+    if gFullScreen:
       var mode: DWORD
       if getConsoleMode(getStdHandle(STD_OUTPUT_HANDLE),
                         addr(gOldConsoleMode)) != 0:
@@ -479,8 +479,8 @@ const
   XtermColor    = "xterm-color"
   Xterm256Color = "xterm-256color"
 
-proc enterFullscreen() =
-  ## Enters full screen mode (clears the terminal).
+proc enterFullScreen() =
+  ## Enters full-screen mode (clears the terminal).
   when defined(posix):
     case getEnv("TERM"):
     of XtermColor:
@@ -492,8 +492,8 @@ proc enterFullscreen() =
   else:
     eraseScreen()
 
-proc exitFullscreen() =
-  ## Exits full screen mode (restores the previous contents of the terminal).
+proc exitFullScreen() =
+  ## Exits full-screen mode (restores the previous contents of the terminal).
   when defined(posix):
     case getEnv("TERM"):
     of XtermColor:
@@ -506,18 +506,18 @@ proc exitFullscreen() =
     eraseScreen()
     setCursorPos(0, 0)
 
-proc illwillInit*(fullscreen: bool = true) =
-  ## Initializes the terminal and enabled non-blocking keyboard input. Needs
+proc illwillInit*(fullScreen: bool = true) =
+  ## Initializes the terminal and enables non-blocking keyboard input. Needs
   ## to be called before doing anything with the library.
-  gFullscreen = fullscreen
-  if gFullscreen: enterFullscreen()
+  gFullScreen = fullScreen
+  if gFullScreen: enterFullScreen()
   consoleInit()
   resetAttributes()
 
 proc illwillDeinit*() =
   ## Resets the terminal to its previous state. Needs to be called before
   ## exiting the application.
-  if gFullscreen: exitFullscreen()
+  if gFullScreen: exitFullScreen()
   consoleDeinit()
   resetAttributes()
   showCursor()
@@ -535,7 +535,7 @@ type
     ##
     ## If `forceWrite` is set to true, the character is always output even
     ## when double buffering is enabled (this is a hack to achieve better
-    ## continuity of horizontal lines when using box drawing UTF-8 symbols in
+    ## continuity of horizontal lines when using UTF-8 box drawing symbols in
     ## the Windows Console).
     ch*: Rune
     fg*: ForegroundColor
@@ -547,16 +547,18 @@ type
     ## A virtual terminal buffer of a fixed width and height. It remembers the
     ## current color and style settings and the current cursor position.
     ##
-    ## Write to the terminal buffer with ``TerminalBuffer.write()`` or you can
-    ## access the character buffer directly with the index operators:
+    ## Write to the terminal buffer with ``TerminalBuffer.write()`` or access
+    ## the character buffer directly with the index operators:
     ##
     ## .. code-block::
+    ##   import illwill, unicode
+    ##
     ##   # Create a new terminal buffer
     ##   var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
     ##
-    ##   # Write the character "X" to the top left of the terminal then read it back
-    ##   tb[0,0] = TerminalChar("X".runeAt(0), fgWhite, bgNone, style = {})
-    ##   let ch = tb[0,0]
+    ##   # Write the character "X" at position (5,5) then read it back
+    ##   tb[5,5] = TerminalChar(ch: "X".runeAt(0), fg: fgYellow, bg: bgNone, style: {})
+    ##   let ch = tb[5,5]
     ##
     ##   # Write "foo" at position (10,10) in bright red
     ##   tb.setForegroundColor(fgRed, bright=true)
@@ -567,7 +569,7 @@ type
     ##   # the current cursor position
     ##   tb.write(15, 12, "bar")
     ##
-    ##   # Output the contents of the buffer to the screen
+    ##   # Output the contents of the buffer to the terminal
     ##   tb.display()
     ##
     width: int
@@ -593,7 +595,7 @@ proc `[]`*(tb: TerminalBuffer, x, y: Natural): TerminalChar =
 
 
 proc fill*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural, ch: string = " ") =
-  ## Fills a rectangular areas with the `ch` character, using the current text
+  ## Fills a rectangular area with the `ch` character using the current text
   ## attributes.
   if x1 < tb.width and y1 < tb.height:
     let
@@ -609,7 +611,7 @@ proc fill*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural, ch: string = " ") =
 
 
 proc clear*(tb: var TerminalBuffer, ch: string = " ") =
-  ## Clears the contents of the terminal buffer with the `ch` character, using
+  ## Clears the contents of the terminal buffer with the `ch` character using
   ## the ``fgNone`` and ``bgNone`` attributes.
   let c = TerminalChar(ch: ch.runeAt(0), fg: fgNone, bg: bgNone, style: {})
   tb.fill(0, 0, tb.width-1, tb.height-1, ch)
@@ -734,7 +736,7 @@ func getStyle*(tb: var TerminalBuffer): set[Style] =
 
 proc resetAttributes*(tb: var TerminalBuffer) =
   ## Resets the current text attributes to ``bgNone``, ``fgWhite`` and clears
-  ## all the style flags.
+  ## all style flags.
   tb.setBackgroundColor(bgNone)
   tb.setForegroundColor(fgWhite)
   tb.setStyle({})
@@ -743,7 +745,7 @@ proc write*(tb: var TerminalBuffer, x, y: Natural, s: string) =
   ## Writes a string into the terminal buffer at the specified position using
   ## the current text attributes. Lines do not wrap and attempting to write
   ## outside the extents of the buffer will not raise an error; the output
-  ## will be cropped to the visible area.
+  ## will be just cropped to the extents of the buffer.
 
   var currX = x
   for ch in runes(s):
@@ -755,6 +757,8 @@ proc write*(tb: var TerminalBuffer, x, y: Natural, s: string) =
   tb.currY = y
 
 proc write*(tb: var TerminalBuffer, s: string) =
+  ## Writes a string into the terminal buffer at the current cursor position
+  ## using the current text attributes.
   write(tb, tb.currX, tb.currY, s)
 
 
@@ -862,7 +866,7 @@ proc hasDoubleBuffering*(): bool =
   result = gDoubleBufferingEnabled
 
 proc display*(tb: TerminalBuffer) =
-  ## Outputs the contents of the terminal buffer to the screen.
+  ## Outputs the contents of the terminal buffer to the actual terminal.
   if not gFullRedrawNextFrame and gDoubleBufferingEnabled:
     if gPrevTerminalBuffer == nil:
       displayFull(tb)
@@ -882,8 +886,7 @@ proc display*(tb: TerminalBuffer) =
     gFullRedrawNextFrame = false
 
 
-type
-  BoxChar = int
+type BoxChar = int
 
 const
   LEFT   = 0x01
@@ -996,13 +999,13 @@ func height*(bb: BoxBuffer): Natural =
   ## Returns the height of the box buffer.
   result = bb.height
 
-proc `[]=`(b: var BoxBuffer, x, y: Natural, c: BoxChar) =
-  if x < b.width and y < b.height:
-    b.buf[b.width * y + x] = c
+proc `[]=`(bb: var BoxBuffer, x, y: Natural, c: BoxChar) =
+  if x < bb.width and y < bb.height:
+    bb.buf[bb.width * y + x] = c
 
-func `[]`(b: BoxBuffer, x, y: Natural): BoxChar =
-  if x < b.width and y < b.height:
-    result = b.buf[b.width * y + x]
+func `[]`(bb: BoxBuffer, x, y: Natural): BoxChar =
+  if x < bb.width and y < bb.height:
+    result = bb.buf[bb.width * y + x]
 
 
 proc copyFrom*(bb: var BoxBuffer,
@@ -1044,69 +1047,106 @@ proc newBoxBufferFrom*(src: BoxBuffer): BoxBuffer =
   bb.copyFrom(src)
   result = bb
 
-proc drawHorizLine*(b: var BoxBuffer, x1, x2, y: Natural,
-                    doubleStyle: bool = false) =
-  ## Draws a horizontal line into the box buffer. Set `doubleStyle` to true
-  ## to draw double lines.
-  if y < b.height:
-    var xStart = x1
-    var xEnd = x2
-    if xStart > xEnd: swap(xStart, xEnd)
-    if xStart < b.width:
-      xEnd = min(xEnd, b.width-1)
-      for x in xStart..xEnd:
-        let pos = y * b.width + x
-        var c = b.buf[pos]
-        var h: int
-        if x == xStart:
-          h = if (c and LEFT) > 0: HORIZ else: RIGHT
-        elif x == xEnd:
-          h = if (c and RIGHT) > 0: HORIZ else: LEFT
-        else:
-          h = HORIZ
-        if doubleStyle:
-          h = h or H_DBL
-        b.buf[pos] = c or h
 
-proc drawVertLine*(b: var BoxBuffer, x, y1, y2: Natural,
-                   doubleStyle: bool = false) =
-  ## Draws a vertical line into the box buffer. Set `doubleStyle` to true
-  ## to draw double lines.
-  if x < b.width:
-    var yStart = y1
-    var yEnd = y2
-    if yStart > yEnd: swap(yStart, yEnd)
-    if yStart < b.height:
-      yEnd = min(yEnd, b.height-1)
-      for y in yStart..yEnd:
-        let pos = y * b.width + x
-        var c = b.buf[pos]
-        var v: int
-        if y == yStart:
-          v = if (c and UP) > 0: VERT else: DOWN
-        elif y == yEnd:
-          v = if (c and DOWN) > 0: VERT else: UP
-        else:
-          v = VERT
-        if doubleStyle:
-          v = v or V_DBL
-        b.buf[pos] = c or v
+proc drawHorizLine*(bb: var BoxBuffer, x1, x2, y: Natural,
+                    doubleStyle: bool = false, connect: bool = true) =
+  ## Draws a horizontal line into the box buffer. Set `doubleStyle` to true to
+  ## draw double lines. Set `connect` to true to connect overlapping lines.
+  if y >= bb.height: return
+  var xStart = x1
+  var xEnd = x2
+  if xStart > xEnd: swap(xStart, xEnd)
+  if xStart >= bb.width: return
 
-proc drawRect*(b: var BoxBuffer, x1, y1, x2, y2: Natural,
-               doubleStyle: bool = false) =
+  xEnd = min(xEnd, bb.width-1)
+  if connect:
+    for x in xStart..xEnd:
+      var c = bb[x,y]
+      var h: int
+      if x == xStart:
+        h = if (c and LEFT) > 0: HORIZ else: RIGHT
+      elif x == xEnd:
+        h = if (c and RIGHT) > 0: HORIZ else: LEFT
+      else:
+        h = HORIZ
+      if doubleStyle: h = h or H_DBL
+      bb[x,y] = c or h
+  else:
+    for x in xStart..xEnd:
+      var h = HORIZ
+      if doubleStyle: h = h or H_DBL
+      bb[x,y] = h
+
+
+proc drawVertLine*(bb: var BoxBuffer, x, y1, y2: Natural,
+                   doubleStyle: bool = false, connect: bool = true) =
+  ## Draws a vertical line into the box buffer. Set `doubleStyle` to true to
+  ## draw double lines. Set `connect` to true to connect overlapping lines.
+  if x >= bb.width: return
+  var yStart = y1
+  var yEnd = y2
+  if yStart > yEnd: swap(yStart, yEnd)
+  if yStart >= bb.height: return
+
+  yEnd = min(yEnd, bb.height-1)
+  if connect:
+    for y in yStart..yEnd:
+      var c = bb[x,y]
+      var v: int
+      if y == yStart:
+        v = if (c and UP) > 0: VERT else: DOWN
+      elif y == yEnd:
+        v = if (c and DOWN) > 0: VERT else: UP
+      else:
+        v = VERT
+      if doubleStyle: v = v or V_DBL
+      bb[x,y] = c or v
+  else:
+    for y in yStart..yEnd:
+      var v = VERT
+      if doubleStyle: v = v or V_DBL
+      bb[x,y] = v
+
+
+proc drawRect*(bb: var BoxBuffer, x1, y1, x2, y2: Natural,
+               doubleStyle: bool = false, connect: bool = true) =
   ## Draws a rectangle into the box buffer. Set `doubleStyle` to true to draw
-  ## double lines.
-  b.drawHorizLine(x1, x2, y1, doubleStyle)
-  b.drawHorizLine(x1, x2, y2, doubleStyle)
-  b.drawVertLine(x1, y1, y2, doubleStyle)
-  b.drawVertLine(x2, y1, y2, doubleStyle)
+  ## double lines. Set `connect` to true to connect overlapping lines.
+  if abs(x1-x2) < 1 or abs(y1-y2) < 1: return
+
+  if connect:
+    bb.drawHorizLine(x1, x2, y1, doubleStyle)
+    bb.drawHorizLine(x1, x2, y2, doubleStyle)
+    bb.drawVertLine(x1, y1, y2, doubleStyle)
+    bb.drawVertLine(x2, y1, y2, doubleStyle)
+  else:
+    bb.drawHorizLine(x1+1, x2-1, y1, doubleStyle, connect = false)
+    bb.drawHorizLine(x1+1, x2-1, y2, doubleStyle, connect = false)
+    bb.drawVertLine(x1, y1+1, y2-1, doubleStyle, connect = false)
+    bb.drawVertLine(x2, y1+1, y2-1, doubleStyle, connect = false)
+
+    var c = RIGHT or DOWN
+    if doubleStyle: c = c or V_DBL or H_DBL
+    bb[x1,y1] = c
+
+    c = LEFT or DOWN
+    if doubleStyle: c = c or V_DBL or H_DBL
+    bb[x2,y1] = c
+
+    c = RIGHT or UP
+    if doubleStyle: c = c or V_DBL or H_DBL
+    bb[x1,y2] = c
+
+    c = LEFT or UP
+    if doubleStyle: c = c or V_DBL or H_DBL
+    bb[x2,y2] = c
 
 
-proc write*(tb: var TerminalBuffer, b: var BoxBuffer) =
+proc write*(tb: var TerminalBuffer, bb: var BoxBuffer) =
   ## Writes the contents of the box buffer into this terminal buffer with
   ## the current text attributes.
-  let width = min(tb.width, b.width)
-  let height = min(tb.height, b.height)
+  let width = min(tb.width, bb.width)
+  let height = min(tb.height, bb.height)
   var horizBoxCharCount: int
   var forceWrite: bool
 
@@ -1114,7 +1154,7 @@ proc write*(tb: var TerminalBuffer, b: var BoxBuffer) =
     horizBoxCharCount = 0
     forceWrite = false
     for x in 0..<width:
-      let boxChar = b[x,y]
+      let boxChar = bb[x,y]
       if boxChar > 0:
         if ((boxChar and LEFT) or (boxChar and RIGHT)) > 0:
           if horizBoxCharCount == 1:
@@ -1132,6 +1172,47 @@ proc write*(tb: var TerminalBuffer, b: var BoxBuffer) =
                              fg: tb.currFg, bg: tb.currBg,
                              style: tb.currStyle, forceWrite: forceWrite)
         tb[x,y] = c
+
+
+type
+  TerminalCmd* = enum  ## commands that can be expressed as arguments
+    resetStyle         ## reset attributes
+
+template writeProcessArg(tb: var TerminalBuffer, s: string) =
+  tb.write(s)
+
+template writeProcessArg(tb: var TerminalBuffer, style: Style) =
+  tb.setStyle({style})
+
+template writeProcessArg(tb: var TerminalBuffer, style: set[Style]) =
+  tb.setStyle(style)
+
+template writeProcessArg(tb: var TerminalBuffer, color: ForegroundColor) =
+  tb.setForegroundColor(color)
+
+template writeProcessArg(tb: var TerminalBuffer, color: BackgroundColor) =
+  tb.setBackgroundColor(color)
+
+template writeProcessArg(tb: var TerminalBuffer, cmd: TerminalCmd) =
+  when cmd == resetStyle:
+    tb.resetAttributes()
+
+
+macro write*(tb: var TerminalBuffer, args: varargs[typed]): untyped =
+  ## TODO
+  result = newNimNode(nnkStmtList)
+  if args.len >= 3 and
+     args[0].kind == nnkIntLit and args[1].kind == nnkIntLit:
+
+    let x = args[0]
+    let y = args[1]
+    result.add(newCall(bindSym"setCursorPos", tb, x, y))
+    for i in 2..<args.len:
+      let item = args[i]
+      result.add(newCall(bindSym"writeProcessArg", tb, item))
+  else:
+    for item in args.items:
+      result.add(newCall(bindSym"writeProcessArg", tb, item))
 
 
 proc drawHorizLine*(tb: var TerminalBuffer, x1, x2, y: Natural,

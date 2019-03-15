@@ -1,12 +1,13 @@
 # Example that prints out keycode enums of the keys pressed on the keyboard
 # and demonstrates the basic structure of a full-screen app
 
-import illwill
 import math, os, strformat, times
+import illwill
 
 
 proc exitProc() {.noconv.} =
   illwillDeinit()
+  showCursor()
   quit(0)
 
 var gLastKeyPressed = Key.None
@@ -40,7 +41,7 @@ proc updateScreen(tb: var TerminalBuffer) =
 
   tb.setBackgroundColor(bgRed)
   tb.setForegroundColor(fgYellow)
-  tb.drawRect(tx-1, ty-1, tx + text.len, ty+1, doubleStyle = true)
+  tb.drawRect(tx-1, ty-1, tx + text.len, ty+1, doubleStyle=true)
 
   tb.write(tx, ty, text)
 
@@ -59,7 +60,7 @@ proc main() =
     var key = getKey()
     case key
     of Key.None: discard
-    of Key.Escape, Key.Q: exitProc(); break
+    of Key.Escape, Key.Q: exitProc()
     else: gLastKeyPressed = key
 
     tb.updateScreen()

@@ -1,11 +1,12 @@
 # Full-screen example to demonstrate the box drawing functionality
 
+import os, strformat
 import illwill
-import math, os, strformat, times
 
 
 proc exitProc() {.noconv.} =
   illwillDeinit()
+  showCursor()
   quit(0)
 
 
@@ -101,7 +102,7 @@ proc main() =
       if gDrawMode == Draw: gDrawMode = Move
       else: gDrawMode = Draw
 
-    of Key.Q: exitProc(); break
+    of Key.Q: exitProc()
     else: discard
 
     tb.updateScreen()
