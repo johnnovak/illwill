@@ -4,14 +4,15 @@
 ## writing cross-platform text mode applications easier. The main features are:
 ##
 ## * Non-blocking keyboard input
-## * Support for key combinations and special keys available both in the
-##   standard Windows Console (``cmd.exe``) and most common POSIX terminals
+## * Support for key combinations and special keys available in the standard
+##   Windows Console (``cmd.exe``) and most common POSIX terminals
 ## * Virtual terminal buffers with double-buffering support (only
 ##   display changes from the previous frame and minimise the number of
 ##   attribute changes to reduce CPU usage)
 ## * Simple graphics using UTF-8 box drawing symbols
 ## * Full-screen support with restoring the contents of the terminal after
-##   exit
+##   exit (restoring works only on POSIX)
+## * Basic suspend/continue (SIGTSTP, SIGCONT) support on POSIX
 ##
 ## The module depends only on the standard `terminal` module. However, you
 ## should not use any `terminal` functions directly, neither should you use
