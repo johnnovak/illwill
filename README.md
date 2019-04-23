@@ -67,7 +67,7 @@ The best way to install the library is by using
 [nimble](https://github.com/nim-lang/nimble):
 
 ```
-nimble install illwill
+nimble install https://github.com/johnnovak/illwill
 ```
 
 ## Usage
