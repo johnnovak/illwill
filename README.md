@@ -5,28 +5,28 @@
 **illwill** is a *(n)curses* inspired simple terminal library that aims to make
 writing cross-platform text mode applications easy. Having said that, it's
 much simpler than (n)curses and it's not as robust by far in terms of
-supporting different encodings, terminal types etc. The aim was to write
-something small and simple in pure Nim that works for 99.99% of users without
+supporting different encodings, terminal types, etc. The aim was to write
+something small and simple in pure Nim that works for 99% of users without
 requiring any external dependencies or a terminfo database.
 
 For "serious" applications, the best is always to write different backends for
-*nix and Windows (one of the reasons being that the Windows Console is buffer
-based, not file based). But I think this library is perfect for small
+*nix and Windows (one of the main reasons being that the Windows Console is
+buffer based, not file based). But I think this library is perfect for small
 cross-platform programs and utilities where you need something more than the
-basic blocking console I/O but you don't actually want to bother with
+basic blocking console I/O, but you don't actually want to bother with
 a full-blown GUI.
 
 ### Main features
 
-* Non-blocking keyboard input.
-* Support for key combinations and special keys available both in the standard
-  Windows Console (cmd.exe) and most common POSIX terminals.
-* Virtual terminal buffers with double-buffering support (only display changes
+* **Non-blocking** keyboard input.
+* Support for **key combinations** and **special keys** available both in the standard
+  Windows Console (`cmd.exe`) and most common POSIX terminals.
+* **Virtual terminal buffers** with **double-buffering** support (only display changes
   from the previous frame and minimise the number of attribute changes to
   reduce CPU usage).
-* Simple graphics using UTF-8 box drawing symbols.
-* Full-screen support with restoring the contents of the terminal after exit.
-* Only depends on the standard terminal module.
+* Simple graphics using **UTF-8 box drawing** symbols.
+* **Full-screen support** with restoring the contents of the terminal after exit.
+* **No dependencies**—only depends on the standard terminal module.
 
 <img src="https://github.com/johnnovak/illwill/raw/master/img/nim-mod-1.png" align="left" width="48%" alt="illwill in action" />
 <img src="https://github.com/johnnovak/illwill/raw/master/img/nim-mod-2.png" width="48%" alt="illwill in action" />
@@ -39,13 +39,14 @@ player that uses illwill for its awesome text-mode user interface</em></p>
 ### Use it if
 
 * You just want something simple that lets you write full-screen terminal
-  apps with non-blocking keyboard input that works on Windows, Mac OS X and
+  apps with non-blocking keyboard input that work on Windows, Mac OS X and
   99.99% of modern Linux distributions.
-* You don't need to support any fancy encodings and terminal types.
+* You don't need to support any fancy encodings and terminal types other than
+  UTF-8.
 * You're developing a custom UI so you don't need any predefined widgets.
 * You don't mind the [immediate mode UI](https://github.com/ocornut/imgui)
   style/approach.
-* You don't want any external dependencies.
+* You absolutely don't want any external dependencies.
 
 ### Don't use it if
 
@@ -54,7 +55,7 @@ player that uses illwill for its awesome text-mode user interface</em></p>
 * You need predefined widgets.
 * You like complicating your life :sunglasses:
 
-### Limitations
+### Limitations & known issues
 
 * Suspend/resume (SIGTSTP/SIGCONT handling) works, but it doesn't properly
   reset the terminal when suspending the app.
@@ -74,7 +75,7 @@ nimble install illwill
 
 This is a simple example on the general structure of a fullscreen terminal
 application. Check out the [examples](/examples) for more advanced use cases
-(e.g. using box drawing buffers, handling terminal resizes etc.)
+(e.g. using box drawing buffers, handling terminal resizes, etc.)
 
 
 ```nimrod
@@ -130,6 +131,6 @@ while true:
 Copyright © 2018-2019 John Novak <<john@johnnovak.net>>
 
 This work is free. You can redistribute it and/or modify it under the terms of
-the **Do What The Fuck You Want To Public License, Version 2**, as published
-by Sam Hocevar. See the `COPYING` file for more details.
+the [Do What The Fuck You Want To Public License, Version 2](http://www.wtfpl.net/), as published
+by Sam Hocevar. See the [COPYING](./COPYING) file for more details.
 
