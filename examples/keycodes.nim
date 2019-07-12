@@ -21,7 +21,7 @@ proc updateScreen(tb: var TerminalBuffer) =
     fillChars = "|/-\\"
 
   let t = epochTime()
-  let ch = fillChars[(fmod(t * 5, fillChars.len.float)).int]
+  let ch = fillChars[((t * 5) mod fillChars.len.float).int]
 
   tb.setForegroundColor(fgBlack, bright=true)
   tb.fill(x1,y1, x2, y2, $ch)

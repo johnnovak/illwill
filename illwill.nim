@@ -613,7 +613,6 @@ proc fill*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural, ch: string = " ") =
 proc clear*(tb: var TerminalBuffer, ch: string = " ") =
   ## Clears the contents of the terminal buffer with the `ch` character using
   ## the ``fgNone`` and ``bgNone`` attributes.
-  let c = TerminalChar(ch: ch.runeAt(0), fg: fgNone, bg: bgNone, style: {})
   tb.fill(0, 0, tb.width-1, tb.height-1, ch)
 
 proc initTerminalBuffer(tb: var TerminalBuffer, width, height: Natural) =
@@ -1199,7 +1198,6 @@ template writeProcessArg(tb: var TerminalBuffer, cmd: TerminalCmd) =
 
 
 macro write*(tb: var TerminalBuffer, args: varargs[typed]): untyped =
-  ## TODO
   result = newNimNode(nnkStmtList)
   if args.len >= 3 and
      args[0].kind == nnkIntLit and args[1].kind == nnkIntLit:
