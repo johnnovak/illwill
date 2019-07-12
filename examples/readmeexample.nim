@@ -1,3 +1,5 @@
+# This is the example code from the README.
+
 import os, strutils
 import illwill
 
