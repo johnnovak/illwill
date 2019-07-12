@@ -1,29 +1,29 @@
 ## :Authors: John Novak
 ##
-## This is a ``curses`` inspired simple terminal library that aims to make
+## This is a `curses` inspired simple terminal library that aims to make
 ## writing cross-platform text mode applications easier. The main features are:
 ##
 ## * Non-blocking keyboard input
 ## * Support for key combinations and special keys available in the standard
-##   Windows Console (``cmd.exe``) and most common POSIX terminals
+##   Windows Console (`cmd.exe`) and most common POSIX terminals
 ## * Virtual terminal buffers with double-buffering support (only
 ##   display changes from the previous frame and minimise the number of
 ##   attribute changes to reduce CPU usage)
 ## * Simple graphics using UTF-8 box drawing symbols
 ## * Full-screen support with restoring the contents of the terminal after
 ##   exit (restoring works only on POSIX)
-## * Basic suspend/continue (SIGTSTP, SIGCONT) support on POSIX
+## * Basic suspend/continue (`SIGTSTP`, `SIGCONT`) support on POSIX
 ##
 ## The module depends only on the standard `terminal` module. However, you
 ## should not use any `terminal` functions directly, neither should you use
-## ``echo``, ``write`` or other similar functions for output. You should only
+## `echo`, `write` or other similar functions for output. You should only
 ## use the interface provided by the module to interact with the terminal.
 ##
 ## The following symbols are exported from the `terminal` module (these are
 ## safe to use):
 ##
-## ``terminalWidth()``, ``terminalHeight()``, ``terminalSize()``,
-## ``hideCursor()``, ``showCursor()``, ``Style``
+## `terminalWidth()`, `terminalHeight()`, `terminalSize()`,
+## `hideCursor()`, `showCursor()`, `Style`
 ##
 
 import macros, os, strformat, terminal, unicode
@@ -511,6 +511,8 @@ proc exitFullScreen() =
 proc illwillInit*(fullScreen: bool = true) =
   ## Initializes the terminal and enables non-blocking keyboard input. Needs
   ## to be called before doing anything with the library.
+  ##
+  ## If the module is already intialised, `IllwillError` is raised.
   if gIllwillInitialised:
     raise newException(IllwillError, "Illwill already initialised")
   gFullScreen = fullScreen
@@ -526,6 +528,8 @@ proc checkInit() =
 proc illwillDeinit*() =
   ## Resets the terminal to its previous state. Needs to be called before
   ## exiting the application.
+  ##
+  ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
   if gFullScreen: exitFullScreen()
   consoleDeinit()
@@ -535,7 +539,9 @@ proc illwillDeinit*() =
 
 proc getKey*(): Key =
   ## Reads the next keystroke in a non-blocking manner. If there are no
-  ## keypress events in the buffer, ``Key.None`` is returned.
+  ## keypress events in the buffer, `Key.None` is returned.
+  ##
+  ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
   getKeyAsync()
 
@@ -545,7 +551,7 @@ type
     ## Represents a character in the terminal buffer, including color and
     ## style information.
     ##
-    ## If `forceWrite` is set to true, the character is always output even
+    ## If `forceWrite` is set to `true`, the character is always output even
     ## when double buffering is enabled (this is a hack to achieve better
     ## continuity of horizontal lines when using UTF-8 box drawing symbols in
     ## the Windows Console).
@@ -559,7 +565,7 @@ type
     ## A virtual terminal buffer of a fixed width and height. It remembers the
     ## current color and style settings and the current cursor position.
     ##
-    ## Write to the terminal buffer with ``TerminalBuffer.write()`` or access
+    ## Write to the terminal buffer with `TerminalBuffer.write()` or access
     ## the character buffer directly with the index operators:
     ##
     ## .. code-block::
@@ -627,11 +633,11 @@ proc fill*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural, ch: string = " ") =
 
 proc clear*(tb: var TerminalBuffer, ch: string = " ") =
   ## Clears the contents of the terminal buffer with the `ch` character using
-  ## the ``fgNone`` and ``bgNone`` attributes.
+  ## the `fgNone` and `bgNone` attributes.
   tb.fill(0, 0, tb.width-1, tb.height-1, ch)
 
 proc initTerminalBuffer(tb: var TerminalBuffer, width, height: Natural) =
-  ## Initializes a new terminal buffer object of a fixed width and height.
+  ## Initializes a new terminal buffer object of a fixed `width` and `height`.
   tb.width = width
   tb.height = height
   newSeq(tb.buf, width * height)
@@ -640,7 +646,7 @@ proc initTerminalBuffer(tb: var TerminalBuffer, width, height: Natural) =
   tb.currStyle = {}
 
 proc newTerminalBuffer*(width, height: Natural): TerminalBuffer =
-  ## Creates a new terminal buffer of a fixed width and height.
+  ## Creates a new terminal buffer of a fixed `width` and `height`.
   var tb = new TerminalBuffer
   tb.initTerminalBuffer(width, height)
   tb.clear()
@@ -749,14 +755,14 @@ func getStyle*(tb: var TerminalBuffer): set[Style] =
   result = tb.currStyle
 
 proc resetAttributes*(tb: var TerminalBuffer) =
-  ## Resets the current text attributes to ``bgNone``, ``fgWhite`` and clears
+  ## Resets the current text attributes to `bgNone`, `fgWhite` and clears
   ## all style flags.
   tb.setBackgroundColor(bgNone)
   tb.setForegroundColor(fgWhite)
   tb.setStyle({})
 
 proc write*(tb: var TerminalBuffer, x, y: Natural, s: string) =
-  ## Writes a string into the terminal buffer at the specified position using
+  ## Writes `s` into the terminal buffer at the specified position using
   ## the current text attributes. Lines do not wrap and attempting to write
   ## outside the extents of the buffer will not raise an error; the output
   ## will be just cropped to the extents of the buffer.
@@ -770,8 +776,8 @@ proc write*(tb: var TerminalBuffer, x, y: Natural, s: string) =
   tb.currY = y
 
 proc write*(tb: var TerminalBuffer, s: string) =
-  ## Writes a string into the terminal buffer at the current cursor position
-  ## using the current text attributes.
+  ## Writes `s` into the terminal buffer at the current cursor position using
+  ## the current text attributes.
   write(tb, tb.currX, tb.currY, s)
 
 
@@ -875,12 +881,16 @@ proc setDoubleBuffering*(enabled: bool) =
   gPrevTerminalBuffer = nil
 
 proc hasDoubleBuffering*(): bool =
-  ## Returns true if double buffering is enabled.
+  ## Returns `true` if double buffering is enabled.
+  ##
+  ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
   result = gDoubleBufferingEnabled
 
 proc display*(tb: TerminalBuffer) =
   ## Outputs the contents of the terminal buffer to the actual terminal.
+  ##
+  ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
   if not gFullRedrawNextFrame and gDoubleBufferingEnabled:
     if gPrevTerminalBuffer == nil:
@@ -1000,7 +1010,7 @@ type BoxBuffer* = ref object
   buf: seq[BoxChar]
 
 proc newBoxBuffer*(width, height: Natural): BoxBuffer =
-  ## Creates a new box buffer of a fixed width and height.
+  ## Creates a new box buffer of a fixed `width` and `height`.
   result = new BoxBuffer
   result.width = width
   result.height = height
@@ -1065,8 +1075,9 @@ proc newBoxBufferFrom*(src: BoxBuffer): BoxBuffer =
 
 proc drawHorizLine*(bb: var BoxBuffer, x1, x2, y: Natural,
                     doubleStyle: bool = false, connect: bool = true) =
-  ## Draws a horizontal line into the box buffer. Set `doubleStyle` to true to
-  ## draw double lines. Set `connect` to true to connect overlapping lines.
+  ## Draws a horizontal line into the box buffer. Set `doubleStyle` to `true`
+  ## to draw double lines. Set `connect` to `true` to connect overlapping
+  ## lines.
   if y >= bb.height: return
   var xStart = x1
   var xEnd = x2
@@ -1095,8 +1106,8 @@ proc drawHorizLine*(bb: var BoxBuffer, x1, x2, y: Natural,
 
 proc drawVertLine*(bb: var BoxBuffer, x, y1, y2: Natural,
                    doubleStyle: bool = false, connect: bool = true) =
-  ## Draws a vertical line into the box buffer. Set `doubleStyle` to true to
-  ## draw double lines. Set `connect` to true to connect overlapping lines.
+  ## Draws a vertical line into the box buffer. Set `doubleStyle` to `true` to
+  ## draw double lines. Set `connect` to `true` to connect overlapping lines.
   if x >= bb.width: return
   var yStart = y1
   var yEnd = y2
@@ -1125,8 +1136,8 @@ proc drawVertLine*(bb: var BoxBuffer, x, y1, y2: Natural,
 
 proc drawRect*(bb: var BoxBuffer, x1, y1, x2, y2: Natural,
                doubleStyle: bool = false, connect: bool = true) =
-  ## Draws a rectangle into the box buffer. Set `doubleStyle` to true to draw
-  ## double lines. Set `connect` to true to connect overlapping lines.
+  ## Draws a rectangle into the box buffer. Set `doubleStyle` to `true` to
+  ## draw double lines. Set `connect` to `true` to connect overlapping lines.
   if abs(x1-x2) < 1 or abs(y1-y2) < 1: return
 
   if connect:
@@ -1214,6 +1225,7 @@ template writeProcessArg(tb: var TerminalBuffer, cmd: TerminalCmd) =
 
 
 macro write*(tb: var TerminalBuffer, args: varargs[typed]): untyped =
+  ## TODO
   result = newNimNode(nnkStmtList)
   if args.len >= 3 and
      args[0].kind == nnkIntLit and args[1].kind == nnkIntLit:

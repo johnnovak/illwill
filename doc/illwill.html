@@ -1036,7 +1036,7 @@ function main() {
 <li>Virtual terminal buffers with double-buffering support (only display changes from the previous frame and minimise the number of attribute changes to reduce CPU usage)</li>
 <li>Simple graphics using UTF-8 box drawing symbols</li>
 <li>Full-screen support with restoring the contents of the terminal after exit (restoring works only on POSIX)</li>
-<li>Basic suspend/continue (SIGTSTP, SIGCONT) support on POSIX</li>
+<li>Basic suspend/continue (<tt class="docutils literal"><span class="pre">SIGTSTP</span></tt>, <tt class="docutils literal"><span class="pre">SIGCONT</span></tt>) support on POSIX</li>
 </ul>
 <p>The module depends only on the standard <tt class="docutils literal"><span class="pre">terminal</span></tt> module. However, you should not use any <tt class="docutils literal"><span class="pre">terminal</span></tt> functions directly, neither should you use <tt class="docutils literal"><span class="pre">echo</span></tt>, <tt class="docutils literal"><span class="pre">write</span></tt> or other similar functions for output. You should only use the interface provided by the module to interact with the terminal.</p>
 <p>The following symbols are exported from the <tt class="docutils literal"><span class="pre">terminal</span></tt> module (these are safe to use):</p>
@@ -1148,7 +1148,7 @@ Supported single key presses and key combinations
 <dd>
 
 <p>Represents a character in the terminal buffer, including color and style information.</p>
-<p>If <tt class="docutils literal"><span class="pre">forceWrite</span></tt> is set to true, the character is always output even when double buffering is enabled (this is a hack to achieve better continuity of horizontal lines when using UTF-8 box drawing symbols in the Windows Console).</p>
+<p>If <tt class="docutils literal"><span class="pre">forceWrite</span></tt> is set to <tt class="docutils literal"><span class="pre">true</span></tt>, the character is always output even when double buffering is enabled (this is a hack to achieve better continuity of horizontal lines when using UTF-8 box drawing symbols in the Windows Console).</p>
 
 
 </dd>
@@ -1218,21 +1218,27 @@ commands that can be expressed as arguments
                                        <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Initializes the terminal and enables non-blocking keyboard input. Needs to be called before doing anything with the library.
+<p>Initializes the terminal and enables non-blocking keyboard input. Needs to be called before doing anything with the library.</p>
+<p>If the module is already intialised, <tt class="docutils literal"><span class="pre">IllwillError</span></tt> is raised.</p>
+
 
 </dd>
 <a id="illwillDeinit"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#illwillDeinit"><span class="Identifier">illwillDeinit</span></a><span class="Other">(</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IllwillError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Resets the terminal to its previous state. Needs to be called before exiting the application.
+<p>Resets the terminal to its previous state. Needs to be called before exiting the application.</p>
+<p>If the module is not intialised, <tt class="docutils literal"><span class="pre">IllwillError</span></tt> is raised.</p>
+
 
 </dd>
 <a id="getKey"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#getKey"><span class="Identifier">getKey</span></a><span class="Other">(</span><span class="Other">)</span><span class="Other">:</span> <a href="illwill.html#Key"><span class="Identifier">Key</span></a> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IllwillError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Reads the next keystroke in a non-blocking manner. If there are no keypress events in the buffer, <tt class="docutils literal"><span class="pre">Key.None</span></tt> is returned.
+<p>Reads the next keystroke in a non-blocking manner. If there are no keypress events in the buffer, <tt class="docutils literal"><span class="pre">Key.None</span></tt> is returned.</p>
+<p>If the module is not intialised, <tt class="docutils literal"><span class="pre">IllwillError</span></tt> is raised.</p>
+
 
 </dd>
 <a id="[]=,TerminalBuffer,Natural,Natural,TerminalChar"></a>
@@ -1268,7 +1274,7 @@ Clears the contents of the terminal buffer with the <tt class="docutils literal"
 <dt><pre><span class="Keyword">proc</span> <a href="#newTerminalBuffer%2CNatural%2CNatural"><span class="Identifier">newTerminalBuffer</span></a><span class="Other">(</span><span class="Identifier">width</span><span class="Other">,</span> <span class="Identifier">height</span><span class="Other">:</span> <span class="Identifier">Natural</span><span class="Other">)</span><span class="Other">:</span> <a href="illwill.html#TerminalBuffer"><span class="Identifier">TerminalBuffer</span></a> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Creates a new terminal buffer of a fixed width and height.
+Creates a new terminal buffer of a fixed <tt class="docutils literal"><span class="pre">width</span></tt> and <tt class="docutils literal"><span class="pre">height</span></tt>.
 
 </dd>
 <a id="copyFrom,TerminalBuffer,TerminalBuffer,Natural,Natural,Natural,Natural,Natural,Natural"></a>
@@ -1353,14 +1359,14 @@ Resets the current text attributes to <tt class="docutils literal"><span class="
 <dt><pre><span class="Keyword">proc</span> <a href="#write%2CTerminalBuffer%2CNatural%2CNatural%2Cstring"><span class="Identifier">write</span></a><span class="Other">(</span><span class="Identifier">tb</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="illwill.html#TerminalBuffer"><span class="Identifier">TerminalBuffer</span></a><span class="Other">;</span> <span class="Identifier">x</span><span class="Other">,</span> <span class="Identifier">y</span><span class="Other">:</span> <span class="Identifier">Natural</span><span class="Other">;</span> <span class="Identifier">s</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Writes a string into the terminal buffer at the specified position using the current text attributes. Lines do not wrap and attempting to write outside the extents of the buffer will not raise an error; the output will be just cropped to the extents of the buffer.
+Writes <tt class="docutils literal"><span class="pre">s</span></tt> into the terminal buffer at the specified position using the current text attributes. Lines do not wrap and attempting to write outside the extents of the buffer will not raise an error; the output will be just cropped to the extents of the buffer.
 
 </dd>
 <a id="write,TerminalBuffer,string"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#write%2CTerminalBuffer%2Cstring"><span class="Identifier">write</span></a><span class="Other">(</span><span class="Identifier">tb</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="illwill.html#TerminalBuffer"><span class="Identifier">TerminalBuffer</span></a><span class="Other">;</span> <span class="Identifier">s</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Writes a string into the terminal buffer at the current cursor position using the current text attributes.
+Writes <tt class="docutils literal"><span class="pre">s</span></tt> into the terminal buffer at the current cursor position using the current text attributes.
 
 </dd>
 <a id="setDoubleBuffering,bool"></a>
@@ -1374,7 +1380,9 @@ Enables or disables double buffering (enabled by default).
 <dt><pre><span class="Keyword">proc</span> <a href="#hasDoubleBuffering"><span class="Identifier">hasDoubleBuffering</span></a><span class="Other">(</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IllwillError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Returns true if double buffering is enabled.
+<p>Returns <tt class="docutils literal"><span class="pre">true</span></tt> if double buffering is enabled.</p>
+<p>If the module is not intialised, <tt class="docutils literal"><span class="pre">IllwillError</span></tt> is raised.</p>
+
 
 </dd>
 <a id="display,TerminalBuffer"></a>
@@ -1382,14 +1390,16 @@ Returns true if double buffering is enabled.
                                 <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Outputs the contents of the terminal buffer to the actual terminal.
+<p>Outputs the contents of the terminal buffer to the actual terminal.</p>
+<p>If the module is not intialised, <tt class="docutils literal"><span class="pre">IllwillError</span></tt> is raised.</p>
+
 
 </dd>
 <a id="newBoxBuffer,Natural,Natural"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#newBoxBuffer%2CNatural%2CNatural"><span class="Identifier">newBoxBuffer</span></a><span class="Other">(</span><span class="Identifier">width</span><span class="Other">,</span> <span class="Identifier">height</span><span class="Other">:</span> <span class="Identifier">Natural</span><span class="Other">)</span><span class="Other">:</span> <a href="illwill.html#BoxBuffer"><span class="Identifier">BoxBuffer</span></a> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Creates a new box buffer of a fixed width and height.
+Creates a new box buffer of a fixed <tt class="docutils literal"><span class="pre">width</span></tt> and <tt class="docutils literal"><span class="pre">height</span></tt>.
 
 </dd>
 <a id="copyFrom,BoxBuffer,BoxBuffer,Natural,Natural,Natural,Natural,Natural,Natural"></a>
@@ -1423,7 +1433,7 @@ Creates a new box buffer with the dimensions of the <tt class="docutils literal"
                   <span class="Identifier">connect</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Draws a horizontal line into the box buffer. Set <tt class="docutils literal"><span class="pre">doubleStyle</span></tt> to true to draw double lines. Set <tt class="docutils literal"><span class="pre">connect</span></tt> to true to connect overlapping lines.
+Draws a horizontal line into the box buffer. Set <tt class="docutils literal"><span class="pre">doubleStyle</span></tt> to <tt class="docutils literal"><span class="pre">true</span></tt> to draw double lines. Set <tt class="docutils literal"><span class="pre">connect</span></tt> to <tt class="docutils literal"><span class="pre">true</span></tt> to connect overlapping lines.
 
 </dd>
 <a id="drawVertLine,BoxBuffer,Natural,Natural,Natural,bool,bool"></a>
@@ -1431,7 +1441,7 @@ Draws a horizontal line into the box buffer. Set <tt class="docutils literal"><s
                  <span class="Identifier">connect</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Draws a vertical line into the box buffer. Set <tt class="docutils literal"><span class="pre">doubleStyle</span></tt> to true to draw double lines. Set <tt class="docutils literal"><span class="pre">connect</span></tt> to true to connect overlapping lines.
+Draws a vertical line into the box buffer. Set <tt class="docutils literal"><span class="pre">doubleStyle</span></tt> to <tt class="docutils literal"><span class="pre">true</span></tt> to draw double lines. Set <tt class="docutils literal"><span class="pre">connect</span></tt> to <tt class="docutils literal"><span class="pre">true</span></tt> to connect overlapping lines.
 
 </dd>
 <a id="drawRect,BoxBuffer,Natural,Natural,Natural,Natural,bool,bool"></a>
@@ -1439,7 +1449,7 @@ Draws a vertical line into the box buffer. Set <tt class="docutils literal"><spa
              <span class="Identifier">connect</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Draws a rectangle into the box buffer. Set <tt class="docutils literal"><span class="pre">doubleStyle</span></tt> to true to draw double lines. Set <tt class="docutils literal"><span class="pre">connect</span></tt> to true to connect overlapping lines.
+Draws a rectangle into the box buffer. Set <tt class="docutils literal"><span class="pre">doubleStyle</span></tt> to <tt class="docutils literal"><span class="pre">true</span></tt> to draw double lines. Set <tt class="docutils literal"><span class="pre">connect</span></tt> to <tt class="docutils literal"><span class="pre">true</span></tt> to connect overlapping lines.
 
 </dd>
 <a id="write,TerminalBuffer,BoxBuffer"></a>
@@ -1558,7 +1568,7 @@ Returns the height of the box buffer.
 <dt><pre><span class="Keyword">macro</span> <a href="#write.m%2CTerminalBuffer%2Cvarargs%5Btyped%5D"><span class="Identifier">write</span></a><span class="Other">(</span><span class="Identifier">tb</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="illwill.html#TerminalBuffer"><span class="Identifier">TerminalBuffer</span></a><span class="Other">;</span> <span class="Identifier">args</span><span class="Other">:</span> <span class="Identifier">varargs</span><span class="Other">[</span><span class="Identifier">typed</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
 <dd>
 
-
+TODO
 
 </dd>
 
@@ -1571,7 +1581,7 @@ Returns the height of the box buffer.
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br/>
-        <small>Made with Nim. Generated: 2019-07-12 11:05:38 UTC</small>
+        <small>Made with Nim. Generated: 2019-07-12 11:21:14 UTC</small>
       </div>
     </div>
   </div>
