@@ -222,6 +222,8 @@ type
     F11 = (1021, "F11"),
     F12 = (1022, "F12")
 
+  IllwillError* = object of Exception
+
 
 func toKey(c: int): Key =
   try:
@@ -230,6 +232,7 @@ func toKey(c: int): Key =
     result = Key.None
 
 
+var gIllwillInitialised = false
 var gFullScreen = false
 var gFullRedrawNextFrame = false
 
@@ -248,13 +251,11 @@ when defined(windows):
 
   const
     ENABLE_WRAP_AT_EOL_OUTPUT   = 0x0002
-    DISABLE_NEWLINE_AUTO_RETURN = 0x0008
 
   var gOldConsoleMode: DWORD
 
   proc consoleInit() =
     if gFullScreen:
-      var mode: DWORD
       if getConsoleMode(getStdHandle(STD_OUTPUT_HANDLE),
                         addr(gOldConsoleMode)) != 0:
         var mode = gOldConsoleMode and (not ENABLE_WRAP_AT_EOL_OUTPUT)
@@ -475,9 +476,10 @@ else:  # OS X & Linux
   template put(s: string) = stdout.write s
 
 
-const
-  XtermColor    = "xterm-color"
-  Xterm256Color = "xterm-256color"
+when defined(posix):
+  const
+    XtermColor    = "xterm-color"
+    Xterm256Color = "xterm-256color"
 
 proc enterFullScreen() =
   ## Enters full-screen mode (clears the terminal).
@@ -509,22 +511,32 @@ proc exitFullScreen() =
 proc illwillInit*(fullScreen: bool = true) =
   ## Initializes the terminal and enables non-blocking keyboard input. Needs
   ## to be called before doing anything with the library.
+  if gIllwillInitialised:
+    raise newException(IllwillError, "Illwill already initialised")
   gFullScreen = fullScreen
   if gFullScreen: enterFullScreen()
   consoleInit()
+  gIllwillInitialised = true
   resetAttributes()
+
+proc checkInit() =
+  if not gIllwillInitialised:
+    raise newException(IllwillError, "Illwill not initialised")
 
 proc illwillDeinit*() =
   ## Resets the terminal to its previous state. Needs to be called before
   ## exiting the application.
+  checkInit()
   if gFullScreen: exitFullScreen()
   consoleDeinit()
+  gIllwillInitialised = false
   resetAttributes()
   showCursor()
 
 proc getKey*(): Key =
   ## Reads the next keystroke in a non-blocking manner. If there are no
   ## keypress events in the buffer, ``Key.None`` is returned.
+  checkInit()
   getKeyAsync()
 
 
@@ -583,20 +595,23 @@ type
 
 proc `[]=`*(tb: var TerminalBuffer, x, y: Natural, ch: TerminalChar) =
   ## Index operator to write a character into the terminal buffer at the
-  ## specified location.
+  ## specified location. Does nothing if the location is outside of the
+  ## extents of the terminal buffer.
   if x < tb.width and y < tb.height:
     tb.buf[tb.width * y + x] = ch
 
 proc `[]`*(tb: TerminalBuffer, x, y: Natural): TerminalChar =
   ## Index operator to read a character from the terminal buffer at the
-  ## specified location.
+  ## specified location. Returns nil if the location is outside of the extents
+  ## of the terminal buffer.
   if x < tb.width and y < tb.height:
     result = tb.buf[tb.width * y + x]
 
 
 proc fill*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural, ch: string = " ") =
   ## Fills a rectangular area with the `ch` character using the current text
-  ## attributes.
+  ## attributes. The rectangle is clipped to the extends of the terminal
+  ## buffer and the call can never fail.
   if x1 < tb.width and y1 < tb.height:
     let
       c = TerminalChar(ch: ch.runeAt(0), fg: tb.currFg, bg: tb.currBg,
@@ -745,7 +760,6 @@ proc write*(tb: var TerminalBuffer, x, y: Natural, s: string) =
   ## the current text attributes. Lines do not wrap and attempting to write
   ## outside the extents of the buffer will not raise an error; the output
   ## will be just cropped to the extents of the buffer.
-
   var currX = x
   for ch in runes(s):
     var c = TerminalChar(ch: ch, fg: tb.currFg, bg: tb.currBg,
@@ -862,10 +876,12 @@ proc setDoubleBuffering*(enabled: bool) =
 
 proc hasDoubleBuffering*(): bool =
   ## Returns true if double buffering is enabled.
+  checkInit()
   result = gDoubleBufferingEnabled
 
 proc display*(tb: TerminalBuffer) =
   ## Outputs the contents of the terminal buffer to the actual terminal.
+  checkInit()
   if not gFullRedrawNextFrame and gDoubleBufferingEnabled:
     if gPrevTerminalBuffer == nil:
       displayFull(tb)

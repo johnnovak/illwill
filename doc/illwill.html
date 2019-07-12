@@ -879,6 +879,8 @@ function main() {
   F2 = (1012, &quot;F2&quot;), F3 = (1013, &quot;F3&quot;), F4 = (1014, &quot;F4&quot;), F5 = (1015, &quot;F5&quot;),
   F6 = (1016, &quot;F6&quot;), F7 = (1017, &quot;F7&quot;), F8 = (1018, &quot;F8&quot;), F9 = (1019, &quot;F9&quot;),
   F10 = (1020, &quot;F10&quot;), F11 = (1021, &quot;F11&quot;), F12 = (1022, &quot;F12&quot;)"><wbr />Key<span class="attachedType"></span></a></li>
+  <li><a class="reference" href="#IllwillError"
+    title="IllwillError = object of Exception"><wbr />Illwill<wbr />Error<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#TerminalChar"
     title="TerminalChar = object
   ch*: Rune
@@ -1030,10 +1032,11 @@ function main() {
   <p class="module-desc"><table class="docinfo" frame="void" rules="none"><col class="docinfo-name" /><col class="docinfo-content" /><tbody valign="top"><tr><th class="docinfo-name">Authors:</th><td> John Novak</td></tr>
 </tbody></table><p>This is a <tt class="docutils literal"><span class="pre">curses</span></tt> inspired simple terminal library that aims to make writing cross-platform text mode applications easier. The main features are:</p>
 <ul class="simple"><li>Non-blocking keyboard input</li>
-<li>Support for key combinations and special keys available both in the standard Windows Console (<tt class="docutils literal"><span class="pre">cmd.exe</span></tt>) and most common POSIX terminals</li>
+<li>Support for key combinations and special keys available in the standard Windows Console (<tt class="docutils literal"><span class="pre">cmd.exe</span></tt>) and most common POSIX terminals</li>
 <li>Virtual terminal buffers with double-buffering support (only display changes from the previous frame and minimise the number of attribute changes to reduce CPU usage)</li>
 <li>Simple graphics using UTF-8 box drawing symbols</li>
-<li>Full-screen support with restoring the contents of the terminal after exit</li>
+<li>Full-screen support with restoring the contents of the terminal after exit (restoring works only on POSIX)</li>
+<li>Basic suspend/continue (SIGTSTP, SIGCONT) support on POSIX</li>
 </ul>
 <p>The module depends only on the standard <tt class="docutils literal"><span class="pre">terminal</span></tt> module. However, you should not use any <tt class="docutils literal"><span class="pre">terminal</span></tt> functions directly, neither should you use <tt class="docutils literal"><span class="pre">echo</span></tt>, <tt class="docutils literal"><span class="pre">write</span></tt> or other similar functions for output. You should only use the interface provided by the module to interact with the terminal.</p>
 <p>The following symbols are exported from the <tt class="docutils literal"><span class="pre">terminal</span></tt> module (these are safe to use):</p>
@@ -1127,6 +1130,13 @@ Background colors
 Supported single key presses and key combinations
 
 </dd>
+<a id="IllwillError"></a>
+<dt><pre><a href="illwill.html#IllwillError"><span class="Identifier">IllwillError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <span class="Identifier">Exception</span></pre></dt>
+<dd>
+
+
+
+</dd>
 <a id="TerminalChar"></a>
 <dt><pre><a href="illwill.html#TerminalChar"><span class="Identifier">TerminalChar</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
   <span class="Identifier">ch</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Rune</span>
@@ -1204,22 +1214,22 @@ commands that can be expressed as arguments
 <h1><a class="toc-backref" href="#12">Procs</a></h1>
 <dl class="item">
 <a id="illwillInit,bool"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#illwillInit%2Cbool"><span class="Identifier">illwillInit</span></a><span class="Other">(</span><span class="Identifier">fullScreen</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
-    <span class="Identifier">ReadEnvEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#illwillInit%2Cbool"><span class="Identifier">illwillInit</span></a><span class="Other">(</span><span class="Identifier">fullScreen</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IllwillError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span>
+                                       <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 Initializes the terminal and enables non-blocking keyboard input. Needs to be called before doing anything with the library.
 
 </dd>
 <a id="illwillDeinit"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#illwillDeinit"><span class="Identifier">illwillDeinit</span></a><span class="Other">(</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadEnvEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#illwillDeinit"><span class="Identifier">illwillDeinit</span></a><span class="Other">(</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IllwillError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 Resets the terminal to its previous state. Needs to be called before exiting the application.
 
 </dd>
 <a id="getKey"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#getKey"><span class="Identifier">getKey</span></a><span class="Other">(</span><span class="Other">)</span><span class="Other">:</span> <a href="illwill.html#Key"><span class="Identifier">Key</span></a> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#getKey"><span class="Identifier">getKey</span></a><span class="Other">(</span><span class="Other">)</span><span class="Other">:</span> <a href="illwill.html#Key"><span class="Identifier">Key</span></a> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IllwillError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 Reads the next keystroke in a non-blocking manner. If there are no keypress events in the buffer, <tt class="docutils literal"><span class="pre">Key.None</span></tt> is returned.
@@ -1229,14 +1239,14 @@ Reads the next keystroke in a non-blocking manner. If there are no keypress even
 <dt><pre><span class="Keyword">proc</span> <a href="#%5B%5D%3D%2CTerminalBuffer%2CNatural%2CNatural%2CTerminalChar"><span class="Identifier">`[]=`</span></a><span class="Other">(</span><span class="Identifier">tb</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="illwill.html#TerminalBuffer"><span class="Identifier">TerminalBuffer</span></a><span class="Other">;</span> <span class="Identifier">x</span><span class="Other">,</span> <span class="Identifier">y</span><span class="Other">:</span> <span class="Identifier">Natural</span><span class="Other">;</span> <span class="Identifier">ch</span><span class="Other">:</span> <a href="illwill.html#TerminalChar"><span class="Identifier">TerminalChar</span></a><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Index operator to write a character into the terminal buffer at the specified location.
+Index operator to write a character into the terminal buffer at the specified location. Does nothing if the location is outside of the extents of the terminal buffer.
 
 </dd>
 <a id="[],TerminalBuffer,Natural,Natural"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#%5B%5D%2CTerminalBuffer%2CNatural%2CNatural"><span class="Identifier">`[]`</span></a><span class="Other">(</span><span class="Identifier">tb</span><span class="Other">:</span> <a href="illwill.html#TerminalBuffer"><span class="Identifier">TerminalBuffer</span></a><span class="Other">;</span> <span class="Identifier">x</span><span class="Other">,</span> <span class="Identifier">y</span><span class="Other">:</span> <span class="Identifier">Natural</span><span class="Other">)</span><span class="Other">:</span> <a href="illwill.html#TerminalChar"><span class="Identifier">TerminalChar</span></a> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Index operator to read a character from the terminal buffer at the specified location.
+Index operator to read a character from the terminal buffer at the specified location. Returns nil if the location is outside of the extents of the terminal buffer.
 
 </dd>
 <a id="fill,TerminalBuffer,Natural,Natural,Natural,Natural,string"></a>
@@ -1244,7 +1254,7 @@ Index operator to read a character from the terminal buffer at the specified loc
     <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Fills a rectangular area with the <tt class="docutils literal"><span class="pre">ch</span></tt> character using the current text attributes.
+Fills a rectangular area with the <tt class="docutils literal"><span class="pre">ch</span></tt> character using the current text attributes. The rectangle is clipped to the extends of the terminal buffer and the call can never fail.
 
 </dd>
 <a id="clear,TerminalBuffer,string"></a>
@@ -1361,15 +1371,15 @@ Enables or disables double buffering (enabled by default).
 
 </dd>
 <a id="hasDoubleBuffering"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#hasDoubleBuffering"><span class="Identifier">hasDoubleBuffering</span></a><span class="Other">(</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#hasDoubleBuffering"><span class="Identifier">hasDoubleBuffering</span></a><span class="Other">(</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IllwillError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 Returns true if double buffering is enabled.
 
 </dd>
 <a id="display,TerminalBuffer"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#display%2CTerminalBuffer"><span class="Identifier">display</span></a><span class="Other">(</span><span class="Identifier">tb</span><span class="Other">:</span> <a href="illwill.html#TerminalBuffer"><span class="Identifier">TerminalBuffer</span></a><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">]</span><span class="Other">,</span>
-                                <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#display%2CTerminalBuffer"><span class="Identifier">display</span></a><span class="Other">(</span><span class="Identifier">tb</span><span class="Other">:</span> <a href="illwill.html#TerminalBuffer"><span class="Identifier">TerminalBuffer</span></a><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IllwillError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span>
+                                <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 Outputs the contents of the terminal buffer to the actual terminal.
@@ -1561,7 +1571,7 @@ Returns the height of the box buffer.
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br/>
-        <small>Made with Nim. Generated: 2019-07-09 05:11:50 UTC</small>
+        <small>Made with Nim. Generated: 2019-07-12 11:05:38 UTC</small>
       </div>
     </div>
   </div>
