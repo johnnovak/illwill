@@ -1,9 +1,9 @@
 # Package
 
 version       = "0.1.0"
-author        = "John Novak"
+author        = "John Novak <john@johnnovak.net>"
 description   = "A curses inspired simple cross-platform console library for Nim"
-license       = "MIT"
+license       = "WTFPL"
 
 skipDirs = @["doc", "examples", "img"]
 
