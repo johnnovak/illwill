@@ -1,6 +1,6 @@
 ## :Authors: John Novak
 ##
-## This is a `curses` inspired simple terminal library that aims to make
+## This is a *curses* inspired simple terminal library that aims to make
 ## writing cross-platform text mode applications easier. The main features are:
 ##
 ## * Non-blocking keyboard input
@@ -14,16 +14,21 @@
 ##   exit (restoring works only on POSIX)
 ## * Basic suspend/continue (`SIGTSTP`, `SIGCONT`) support on POSIX
 ##
-## The module depends only on the standard `terminal` module. However, you
-## should not use any `terminal` functions directly, neither should you use
-## `echo`, `write` or other similar functions for output. You should only
+## The module depends only on the standard `terminal
+## <https://nim-lang.org/docs/terminal.html>`_ module. However, you
+## should not use any terminal functions directly, neither should you use
+## `echo`, `write` or other similar functions for output. You should **only**
 ## use the interface provided by the module to interact with the terminal.
 ##
-## The following symbols are exported from the `terminal` module (these are
+## The following symbols are exported from the terminal_ module (these are
 ## safe to use):
 ##
-## `terminalWidth()`, `terminalHeight()`, `terminalSize()`,
-## `hideCursor()`, `showCursor()`, `Style`
+## * `terminalWidth() <https://nim-lang.org/docs/terminal.html#terminalWidth>`_
+## * `terminalHeight() <https://nim-lang.org/docs/terminal.html#terminalHeight>`_
+## * `terminalSize() <https://nim-lang.org/docs/terminal.html#terminalSize>`_
+## * `hideCursor() <https://nim-lang.org/docs/terminal.html#hideCursor.t>`_
+## * `showCursor() <https://nim-lang.org/docs/terminal.html#showCursor.t>`_
+## * `Style <https://nim-lang.org/docs/terminal.html#Style>`_
 ##
 
 import macros, os, strformat, terminal, unicode
@@ -566,10 +571,15 @@ type
     ## current color and style settings and the current cursor position.
     ##
     ## Write to the terminal buffer with `TerminalBuffer.write()` or access
-    ## the character buffer directly with the index operators:
+    ## the character buffer directly with the index operators.
+    ##
+    ## Example:
     ##
     ## .. code-block::
     ##   import illwill, unicode
+    ##
+    ##   # Initialise the console in non-fullscreen mode
+    ##   illwillInit(fullscreen=false)
     ##
     ##   # Create a new terminal buffer
     ##   var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
@@ -587,8 +597,14 @@ type
     ##   # the current cursor position
     ##   tb.write(15, 12, "bar")
     ##
+    ##   tb.write(0, 20, "Normal ", fgYellow, "ESC", fgWhite,
+    ##                   " or ", fgYellow, "Q", fgWhite, " to quit")
+    ##
     ##   # Output the contents of the buffer to the terminal
     ##   tb.display()
+    ##
+    ##   # Clean up
+    ##   illwillDeinit()
     ##
     width: int
     height: int
@@ -1225,7 +1241,46 @@ template writeProcessArg(tb: var TerminalBuffer, cmd: TerminalCmd) =
 
 
 macro write*(tb: var TerminalBuffer, args: varargs[typed]): untyped =
-  ## TODO
+  ## Special version of `write` that allows to intersperse text literals with
+  ## set attribute commands.
+  ##
+  ## Example:
+  ##
+  ## .. code-block::
+  ##   import illwill
+  ##
+  ##   illwillInit(fullscreen=false)
+  ##
+  ##   var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
+  ##
+  ##   tb.setForegroundColor(fgGreen)
+  ##   tb.setBackgroundColor(bgBlue)
+  ##   tb.write(0, 10, "before")
+  ##
+  ##   tb.write(0, 11, "unchanged", resetStyle, fgYellow, "yellow", bgRed, "red bg",
+  ##                   styleBlink, "blink", resetStyle, "reset")
+  ##
+  ##   tb.write(0, 12, "after")
+  ##
+  ##   tb.display()
+  ##
+  ##   illwillDeinit()
+  ##
+  ## This will output the following:
+  ##
+  ## * 1st row:
+  ##   - `before` with blue background, green foreground and default style
+  ## * 2nd row:
+  ##   - `unchanged` with blue background, green foreground and default style
+  ##   - `yellow` with default background, yellow foreground and default style
+  ##   - `red bg` with red background, yellow foreground and default style
+  ##   - `blink` with red background, yellow foreground and blink style (if
+  ##     supported by the terminal)
+  ##   - `reset` with the default background and foreground and default style
+  ## * 3rd row:
+  ##   - `after` with the default background and foreground and default style
+  ##
+  ##
   result = newNimNode(nnkStmtList)
   if args.len >= 3 and
      args[0].kind == nnkIntLit and args[1].kind == nnkIntLit:

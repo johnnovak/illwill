@@ -1030,7 +1030,7 @@ function main() {
   <div id="tocRoot"></div>
   
   <p class="module-desc"><table class="docinfo" frame="void" rules="none"><col class="docinfo-name" /><col class="docinfo-content" /><tbody valign="top"><tr><th class="docinfo-name">Authors:</th><td> John Novak</td></tr>
-</tbody></table><p>This is a <tt class="docutils literal"><span class="pre">curses</span></tt> inspired simple terminal library that aims to make writing cross-platform text mode applications easier. The main features are:</p>
+</tbody></table><p>This is a <em>curses</em> inspired simple terminal library that aims to make writing cross-platform text mode applications easier. The main features are:</p>
 <ul class="simple"><li>Non-blocking keyboard input</li>
 <li>Support for key combinations and special keys available in the standard Windows Console (<tt class="docutils literal"><span class="pre">cmd.exe</span></tt>) and most common POSIX terminals</li>
 <li>Virtual terminal buffers with double-buffering support (only display changes from the previous frame and minimise the number of attribute changes to reduce CPU usage)</li>
@@ -1038,9 +1038,15 @@ function main() {
 <li>Full-screen support with restoring the contents of the terminal after exit (restoring works only on POSIX)</li>
 <li>Basic suspend/continue (<tt class="docutils literal"><span class="pre">SIGTSTP</span></tt>, <tt class="docutils literal"><span class="pre">SIGCONT</span></tt>) support on POSIX</li>
 </ul>
-<p>The module depends only on the standard <tt class="docutils literal"><span class="pre">terminal</span></tt> module. However, you should not use any <tt class="docutils literal"><span class="pre">terminal</span></tt> functions directly, neither should you use <tt class="docutils literal"><span class="pre">echo</span></tt>, <tt class="docutils literal"><span class="pre">write</span></tt> or other similar functions for output. You should only use the interface provided by the module to interact with the terminal.</p>
-<p>The following symbols are exported from the <tt class="docutils literal"><span class="pre">terminal</span></tt> module (these are safe to use):</p>
-<p><tt class="docutils literal"><span class="pre">terminalWidth()</span></tt>, <tt class="docutils literal"><span class="pre">terminalHeight()</span></tt>, <tt class="docutils literal"><span class="pre">terminalSize()</span></tt>, <tt class="docutils literal"><span class="pre">hideCursor()</span></tt>, <tt class="docutils literal"><span class="pre">showCursor()</span></tt>, <tt class="docutils literal"><span class="pre">Style</span></tt> </p>
+<p>The module depends only on the standard <a class="reference external" href="https://nim-lang.org/docs/terminal.html">terminal</a> module. However, you should not use any terminal functions directly, neither should you use <tt class="docutils literal"><span class="pre">echo</span></tt>, <tt class="docutils literal"><span class="pre">write</span></tt> or other similar functions for output. You should <strong>only</strong> use the interface provided by the module to interact with the terminal.</p>
+<p>The following symbols are exported from the <a class="reference external" href="https://nim-lang.org/docs/terminal.html">terminal</a> module (these are safe to use):</p>
+<ul class="simple"><li><a class="reference external" href="https://nim-lang.org/docs/terminal.html#terminalWidth">terminalWidth()</a></li>
+<li><a class="reference external" href="https://nim-lang.org/docs/terminal.html#terminalHeight">terminalHeight()</a></li>
+<li><a class="reference external" href="https://nim-lang.org/docs/terminal.html#terminalSize">terminalSize()</a></li>
+<li><a class="reference external" href="https://nim-lang.org/docs/terminal.html#hideCursor.t">hideCursor()</a></li>
+<li><a class="reference external" href="https://nim-lang.org/docs/terminal.html#showCursor.t">showCursor()</a></li>
+<li><a class="reference external" href="https://nim-lang.org/docs/terminal.html#Style">Style</a></li>
+</ul>
 </p>
   <div class="section" id="7">
 <h1><a class="toc-backref" href="#7">Types</a></h1>
@@ -1166,8 +1172,12 @@ Supported single key presses and key combinations
 <dd>
 
 <p>A virtual terminal buffer of a fixed width and height. It remembers the current color and style settings and the current cursor position.</p>
-<p>Write to the terminal buffer with <tt class="docutils literal"><span class="pre">TerminalBuffer.write()</span></tt> or access the character buffer directly with the index operators:</p>
+<p>Write to the terminal buffer with <tt class="docutils literal"><span class="pre">TerminalBuffer.write()</span></tt> or access the character buffer directly with the index operators.</p>
+<p>Example:</p>
 <pre class="listing"><span class="Keyword">import</span> <span class="Identifier">illwill</span><span class="Punctuation">,</span> <span class="Identifier">unicode</span>
+
+<span class="Comment"># Initialise the console in non-fullscreen mode</span>
+<span class="Identifier">illwillInit</span><span class="Punctuation">(</span><span class="Identifier">fullscreen</span><span class="Operator">=</span><span class="Identifier">false</span><span class="Punctuation">)</span>
 
 <span class="Comment"># Create a new terminal buffer</span>
 <span class="Keyword">var</span> <span class="Identifier">tb</span> <span class="Operator">=</span> <span class="Identifier">newTerminalBuffer</span><span class="Punctuation">(</span><span class="Identifier">terminalWidth</span><span class="Punctuation">(</span><span class="Punctuation">)</span><span class="Punctuation">,</span> <span class="Identifier">terminalHeight</span><span class="Punctuation">(</span><span class="Punctuation">)</span><span class="Punctuation">)</span>
@@ -1185,8 +1195,14 @@ Supported single key presses and key combinations
 <span class="Comment"># the current cursor position</span>
 <span class="Identifier">tb</span><span class="Operator">.</span><span class="Identifier">write</span><span class="Punctuation">(</span><span class="DecNumber">15</span><span class="Punctuation">,</span> <span class="DecNumber">12</span><span class="Punctuation">,</span> <span class="StringLit">&quot;bar&quot;</span><span class="Punctuation">)</span>
 
+<span class="Identifier">tb</span><span class="Operator">.</span><span class="Identifier">write</span><span class="Punctuation">(</span><span class="DecNumber">0</span><span class="Punctuation">,</span> <span class="DecNumber">20</span><span class="Punctuation">,</span> <span class="StringLit">&quot;Normal &quot;</span><span class="Punctuation">,</span> <span class="Identifier">fgYellow</span><span class="Punctuation">,</span> <span class="StringLit">&quot;ESC&quot;</span><span class="Punctuation">,</span> <span class="Identifier">fgWhite</span><span class="Punctuation">,</span>
+                <span class="StringLit">&quot; or &quot;</span><span class="Punctuation">,</span> <span class="Identifier">fgYellow</span><span class="Punctuation">,</span> <span class="StringLit">&quot;Q&quot;</span><span class="Punctuation">,</span> <span class="Identifier">fgWhite</span><span class="Punctuation">,</span> <span class="StringLit">&quot; to quit&quot;</span><span class="Punctuation">)</span>
+
 <span class="Comment"># Output the contents of the buffer to the terminal</span>
-<span class="Identifier">tb</span><span class="Operator">.</span><span class="Identifier">display</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre>
+<span class="Identifier">tb</span><span class="Operator">.</span><span class="Identifier">display</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+
+<span class="Comment"># Clean up</span>
+<span class="Identifier">illwillDeinit</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre>
 
 </dd>
 <a id="BoxBuffer"></a>
@@ -1568,7 +1584,41 @@ Returns the height of the box buffer.
 <dt><pre><span class="Keyword">macro</span> <a href="#write.m%2CTerminalBuffer%2Cvarargs%5Btyped%5D"><span class="Identifier">write</span></a><span class="Other">(</span><span class="Identifier">tb</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="illwill.html#TerminalBuffer"><span class="Identifier">TerminalBuffer</span></a><span class="Other">;</span> <span class="Identifier">args</span><span class="Other">:</span> <span class="Identifier">varargs</span><span class="Other">[</span><span class="Identifier">typed</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
 <dd>
 
-TODO
+<p>Special version of <tt class="docutils literal"><span class="pre">write</span></tt> that allows to intersperse text literals with set attribute commands.</p>
+<p>Example:</p>
+<pre class="listing"><span class="Keyword">import</span> <span class="Identifier">illwill</span>
+
+<span class="Identifier">illwillInit</span><span class="Punctuation">(</span><span class="Identifier">fullscreen</span><span class="Operator">=</span><span class="Identifier">false</span><span class="Punctuation">)</span>
+
+<span class="Keyword">var</span> <span class="Identifier">tb</span> <span class="Operator">=</span> <span class="Identifier">newTerminalBuffer</span><span class="Punctuation">(</span><span class="Identifier">terminalWidth</span><span class="Punctuation">(</span><span class="Punctuation">)</span><span class="Punctuation">,</span> <span class="Identifier">terminalHeight</span><span class="Punctuation">(</span><span class="Punctuation">)</span><span class="Punctuation">)</span>
+
+<span class="Identifier">tb</span><span class="Operator">.</span><span class="Identifier">setForegroundColor</span><span class="Punctuation">(</span><span class="Identifier">fgGreen</span><span class="Punctuation">)</span>
+<span class="Identifier">tb</span><span class="Operator">.</span><span class="Identifier">setBackgroundColor</span><span class="Punctuation">(</span><span class="Identifier">bgBlue</span><span class="Punctuation">)</span>
+<span class="Identifier">tb</span><span class="Operator">.</span><span class="Identifier">write</span><span class="Punctuation">(</span><span class="DecNumber">0</span><span class="Punctuation">,</span> <span class="DecNumber">10</span><span class="Punctuation">,</span> <span class="StringLit">&quot;before&quot;</span><span class="Punctuation">)</span>
+
+<span class="Identifier">tb</span><span class="Operator">.</span><span class="Identifier">write</span><span class="Punctuation">(</span><span class="DecNumber">0</span><span class="Punctuation">,</span> <span class="DecNumber">11</span><span class="Punctuation">,</span> <span class="StringLit">&quot;unchanged&quot;</span><span class="Punctuation">,</span> <span class="Identifier">resetStyle</span><span class="Punctuation">,</span> <span class="Identifier">fgYellow</span><span class="Punctuation">,</span> <span class="StringLit">&quot;yellow&quot;</span><span class="Punctuation">,</span> <span class="Identifier">bgRed</span><span class="Punctuation">,</span> <span class="StringLit">&quot;red bg&quot;</span><span class="Punctuation">,</span>
+                <span class="Identifier">styleBlink</span><span class="Punctuation">,</span> <span class="StringLit">&quot;blink&quot;</span><span class="Punctuation">,</span> <span class="Identifier">resetStyle</span><span class="Punctuation">,</span> <span class="StringLit">&quot;reset&quot;</span><span class="Punctuation">)</span>
+
+<span class="Identifier">tb</span><span class="Operator">.</span><span class="Identifier">write</span><span class="Punctuation">(</span><span class="DecNumber">0</span><span class="Punctuation">,</span> <span class="DecNumber">12</span><span class="Punctuation">,</span> <span class="StringLit">&quot;after&quot;</span><span class="Punctuation">)</span>
+
+<span class="Identifier">tb</span><span class="Operator">.</span><span class="Identifier">display</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+
+<span class="Identifier">illwillDeinit</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre><p>This will output the following:</p>
+<ul class="simple"><li>1st row:<ul class="simple"><li><tt class="docutils literal"><span class="pre">before</span></tt> with blue background, green foreground and default style</li>
+</ul>
+</li>
+<li>2nd row:<ul class="simple"><li><tt class="docutils literal"><span class="pre">unchanged</span></tt> with blue background, green foreground and default style</li>
+<li><tt class="docutils literal"><span class="pre">yellow</span></tt> with default background, yellow foreground and default style</li>
+<li><tt class="docutils literal"><span class="pre">red bg</span></tt> with red background, yellow foreground and default style</li>
+<li><tt class="docutils literal"><span class="pre">blink</span></tt> with red background, yellow foreground and blink style (if supported by the terminal)</li>
+<li><tt class="docutils literal"><span class="pre">reset</span></tt> with the default background and foreground and default style</li>
+</ul>
+</li>
+<li>3rd row:<ul class="simple"><li><tt class="docutils literal"><span class="pre">after</span></tt> with the default background and foreground and default style</li>
+</ul>
+</li>
+</ul>
+
 
 </dd>
 
@@ -1581,7 +1631,7 @@ TODO
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br/>
-        <small>Made with Nim. Generated: 2019-07-12 11:21:14 UTC</small>
+        <small>Made with Nim. Generated: 2019-07-13 02:49:35 UTC</small>
       </div>
     </div>
   </div>
