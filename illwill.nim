@@ -385,7 +385,7 @@ else:  # OS X & Linux
     discard tcSetAttr(STDIN_FILENO, TCSANOW, ttyState.addr)
 
 
-  proc kbhit(): cint =
+  proc kbhit(blocking: bool = false): cint =
     var tv: Timeval
     tv.tv_sec = Time(0)
     tv.tv_usec = 0
@@ -393,7 +393,11 @@ else:  # OS X & Linux
     var fds: TFdSet
     FD_ZERO(fds)
     FD_SET(STDIN_FILENO, fds)
-    discard select(STDIN_FILENO+1, fds.addr, nil, nil, tv.addr)
+
+    if blocking:
+      discard select(STDIN_FILENO+1, fds.addr, nil, nil, nil)
+    else:
+      discard select(STDIN_FILENO+1, fds.addr, nil, nil, tv.addr)
     return FD_ISSET(STDIN_FILENO, fds)
 
 
@@ -478,6 +482,22 @@ else:  # OS X & Linux
     else:
       result = parseKey(i)
 
+  proc getKeySync(): Key =
+    if kbhit(true) <= 0:
+      return Key.None
+
+    var i = 0
+    while i < KeySequenceMaxLen:
+      var ret = read(0, keyBuf[i].addr, 1)
+      if ret > 0:
+        i += 1
+      else:
+        break
+    if i == 0:  # nothing read
+      result = Key.None
+    else:
+      result = parseKey(i)
+
   template put(s: string) = stdout.write s
 
 
@@ -542,13 +562,17 @@ proc illwillDeinit*() =
   resetAttributes()
   showCursor()
 
-proc getKey*(): Key =
+proc getKey*(blocking: bool = false): Key =
   ## Reads the next keystroke in a non-blocking manner. If there are no
   ## keypress events in the buffer, `Key.None` is returned.
   ##
   ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
-  getKeyAsync()
+
+  if blocking:
+    getKeySync()
+  else:
+    getKeyAsync()
 
 
 type
