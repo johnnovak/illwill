@@ -1239,6 +1239,12 @@ template writeProcessArg(tb: var TerminalBuffer, cmd: TerminalCmd) =
   when cmd == resetStyle:
     tb.resetAttributes()
 
+macro writePos*(tb: var TerminalBuffer, x,y: int, args: varargs[typed]): untyped = 
+  result = newNimNode(nnkStmtList)
+  result.add(newCall(bindSym"setCursorPos", tb, x, y))
+  for i in 0..<args.len:
+    let item = args[i]
+    result.add(newCall(bindSym"writeProcessArg", tb, item))
 
 macro write*(tb: var TerminalBuffer, args: varargs[typed]): untyped =
   ## Special version of `write` that allows to intersperse text literals with
