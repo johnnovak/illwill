@@ -32,6 +32,7 @@
 ##
 
 import macros, os, strformat, terminal, unicode
+import bitops
 
 export terminal.terminalWidth
 export terminal.terminalHeight
@@ -225,9 +226,27 @@ type
     F9  = (1019, "F9"),
     F10 = (1020, "F10"),
     F11 = (1021, "F11"),
-    F12 = (1022, "F12")
+    F12 = (1022, "F12"),
+
+    # TODO Mouse event
+    Mouse = (5000, "Mouse")
 
   IllwillError* = object of Exception
+
+# TODO VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
+var mouseX: int
+var mouseY: int
+
+
+# Does not work?
+type MouseButtonAction* {.pure.} = enum 
+  Pressed, Released
+var mouseButtonAction: MouseButtonAction 
+
+proc getMouse*(): tuple[x: int, y: int, action: MouseButtonAction] =
+  # -1 because illwill buffer starts at 0 ?
+  return (mouseX-1, mouseY-1, mouseButtonAction)
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
 func toKey(c: int): Key =
@@ -337,6 +356,7 @@ when defined(windows):
 
 else:  # OS X & Linux
   import posix, tables, termios
+  import strutils # TODO mouse
 
   proc consoleInit()
   proc consoleDeinit()
@@ -436,12 +456,45 @@ else:  # OS X & Linux
       ord(Key.F9):        @["\e[20~"],
       ord(Key.F10):       @["\e[21~"],
       ord(Key.F11):       @["\e[23~"],
-      ord(Key.F12):       @["\e[24~"]
+      ord(Key.F12):       @["\e[24~"],
     }.toTable
+
+
+  proc splitInputs(inp: openarray[int], max: int): seq[seq[int]] =
+    ## TODO for mouse
+    var parts: seq[seq[int]] = @[]
+    var cur: seq[int] = @[]
+    for ii in inp[0..max-1]:
+      if ii == ord('M'): # M
+        ## Button press
+        parts.add cur
+        mouseButtonAction = Pressed
+        break
+      elif ii == ord('m'):
+        ## Button release
+        parts.add cur
+        mouseButtonAction = Released
+        break
+      elif ii != ord(';'):
+        cur.add ii
+      else:
+        parts.add cur
+        cur = @[]
+    return parts
+
+  proc getPos(inp: seq[int]): int =
+    ## TODO for mouse
+    var str = ""
+    for ii in inp:
+      # echo ii.chr
+      str &= $(ii.chr)
+    result = parseInt(str)
+      # result +=  #(ii - 0x32)
 
   proc parseKey(charsRead: int): Key =
     # Inspired by
     # https://github.com/mcandre/charm/blob/master/lib/charm.c
+    # echo keyBuf
     var key = Key.None
     if charsRead == 1:
       let ch = keyBuf[0]
@@ -455,7 +508,17 @@ else:  # OS X & Linux
                                   # we'll ignore them
       else:
         key = toKey(ch)
+    elif charsRead > 3 and keyBuf[0] == 27 and keyBuf[1] == 91 and keyBuf[2] == 60:
+      # echo charsRead
+      let parts = splitInputs(keyBuf, 99) # TODO charsRead is wrong?
+      mouseX = parts[1].getPos()
+      mouseY = parts[2].getPos()
+      # echo "MOUSE STUFF ", posX, ":" ,  posY  #, ":", posY #splitInputs(keyBuf)[1].getPos() #cast[uint16](keyBuf[6..7]) #.uint16 # keyBuf[6]-32 , " ", keyBuf[7] - 32
+      # echo ": ", cast[cstring](addr keyBuf), "<"
+      # echo parts
+      return Key.Mouse
     else:
+      
       var inputSeq = ""
       for i in 0..<charsRead:
         inputSeq &= char(keyBuf[i])
