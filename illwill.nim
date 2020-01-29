@@ -275,18 +275,21 @@ type
   IllwillError* = object of Exception
 
 # TODO VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
-var mouseX: int
-var mouseY: int
 
+type 
+  MouseButtonAction* {.pure.} = enum 
+    Pressed, Released
+  MouseInfo* = tuple[x: int, y: int, action: MouseButtonAction, mode: MouseMode]
+  MouseMode* = enum
+    Disabled, TrackClick, TrackAny
+var gMouseX: int
+var gMouseY: int
+var gMouseMode: MouseMode
+var gMouseButtonAction: MouseButtonAction 
 
-# Does not work?
-type MouseButtonAction* {.pure.} = enum 
-  Pressed, Released
-var mouseButtonAction: MouseButtonAction 
-
-proc getMouse*(): tuple[x: int, y: int, action: MouseButtonAction] =
+proc getMouse*(): MouseInfo =
   # -1 because illwill buffer starts at 0 ?
-  return (mouseX-1, mouseY-1, mouseButtonAction)
+  return (gMouseX-1, gMouseY-1, gMouseButtonAction, gMouseMode)
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
@@ -300,7 +303,7 @@ func toKey(c: int): Key =
 var gIllwillInitialised = false
 var gFullScreen = false
 var gFullRedrawNextFrame = false
-var gMouse = false
+# var gMouse = false
 
 when defined(windows):
   import encodings, unicode, winlean
@@ -510,12 +513,12 @@ else:  # OS X & Linux
       if ii == ord('M'): # M
         ## Button press
         parts.add cur
-        mouseButtonAction = Pressed
+        gMouseButtonAction = Pressed
         break
       elif ii == ord('m'):
         ## Button release
         parts.add cur
-        mouseButtonAction = Released
+        gMouseButtonAction = Released
         break
       elif ii != ord(';'):
         cur.add ii
@@ -553,8 +556,8 @@ else:  # OS X & Linux
     elif charsRead > 3 and keyBuf[0] == 27 and keyBuf[1] == 91 and keyBuf[2] == 60:
       # echo charsRead
       let parts = splitInputs(keyBuf, 99) # TODO charsRead is wrong?
-      mouseX = parts[1].getPos()
-      mouseY = parts[2].getPos()
+      gMouseX = parts[1].getPos()
+      gMouseY = parts[2].getPos()
       # echo "MOUSE STUFF ", posX, ":" ,  posY  #, ":", posY #splitInputs(keyBuf)[1].getPos() #cast[uint16](keyBuf[6..7]) #.uint16 # keyBuf[6]-32 , " ", keyBuf[7] - 32
       # echo ": ", cast[cstring](addr keyBuf), "<"
       # echo parts
@@ -618,23 +621,31 @@ proc exitFullScreen() =
     eraseScreen()
     setCursorPos(0, 0)
 
-proc enableMouse() = 
-  stdout.write mouseTrackButtonPress
+proc enableMouse(mouseMode: MouseMode) = 
+  case mouseMode
+  of Disabled: discard
+  of TrackAny: stdout.write mouseTrackAnyEvent
+  of TrackClick: stdout.write mouseTrackButtonPress
 
-proc disableMouse() =
-  stdout.write disableMouseTrackButtonPress
+proc disableMouse(mouseMode: MouseMode) =
+  case mouseMode
+  of Disabled: discard
+  of TrackAny: stdout.write disableMouseTrackAnyEvent
+  of TrackClick: stdout.write disableMouseTrackButtonPress
 
-proc illwillInit*(fullScreen: bool = true, mouse: bool = false) =
+proc illwillInit*(fullScreen: bool = true, mouseMode: MouseMode = Disabled) =
   ## Initializes the terminal and enables non-blocking keyboard input. Needs
   ## to be called before doing anything with the library.
   ##
+  ## If `mouse = true` mouse button pressen and releases are tracked
+  ## 
   ## If the module is already intialised, `IllwillError` is raised.
   if gIllwillInitialised:
     raise newException(IllwillError, "Illwill already initialised")
   gFullScreen = fullScreen
   if gFullScreen: enterFullScreen()
-  gMouse = mouse
-  if gMouse: enableMouse()
+  gMouseMode = mouseMode
+  enableMouse(gMouseMode)
   consoleInit()
   gIllwillInitialised = true
   resetAttributes()
@@ -650,7 +661,7 @@ proc illwillDeinit*() =
   ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
   if gFullScreen: exitFullScreen()
-  if gMouse: disableMouse()
+  disableMouse(gMouseMode)
   consoleDeinit()
   gIllwillInitialised = false
   resetAttributes()
