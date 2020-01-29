@@ -69,18 +69,17 @@ export terminal.Style
 #define SET_PASTE_QUOTE             2005 /* Quote each char during paste */
 #define SET_PASTE_LITERAL_NL        2006 /* Paste "\n" as C-j */
 
-const 
+const
   CSI = 0x1B.chr & 0x5B.chr
   SET_BTN_EVENT_MOUSE = "1002"
   SET_ANY_EVENT_MOUSE = "1003"
   SET_SGR_EXT_MODE_MOUSE = "1006"
   ENABLE = "h"
   DISABLE = "l"
-  mouseTrackButtonPress = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{ENABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{ENABLE}"
-  mouseTrackAnyEvent = fmt"{CSI}?{SET_ANY_EVENT_MOUSE}{ENABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{ENABLE}"
-  disableMouseTrackButtonPress = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{DISABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{DISABLE}"
-  disableMouseTrackAnyEvent = fmt"{CSI}?{SET_ANY_EVENT_MOUSE}{DISABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{DISABLE}"  
-
+  mouseTrackButton = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{ENABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{ENABLE}"
+  mouseTrackAny = fmt"{CSI}?{SET_ANY_EVENT_MOUSE}{ENABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{ENABLE}"
+  disableMouseTrackButton = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{DISABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{DISABLE}"
+  disableMouseTrackAny = fmt"{CSI}?{SET_ANY_EVENT_MOUSE}{DISABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{DISABLE}"
 
 type
   ForegroundColor* = enum   ## Foreground colors
@@ -269,29 +268,39 @@ type
     F11 = (1021, "F11"),
     F12 = (1022, "F12"),
 
-    # TODO Mouse event
-    Mouse = (5000, "Mouse")
+    Mouse = (5000, "Mouse") # TODO Mouse event; which number for Mouse?
 
   IllwillError* = object of Exception
 
 # TODO VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
 
-type 
-  MouseButtonAction* {.pure.} = enum 
+type
+  MouseButtonAction* {.pure.} = enum
     Pressed, Released
-  MouseInfo* = tuple[x: int, y: int, action: MouseButtonAction, mode: MouseMode]
-  MouseMode* = enum
+  MouseInfo* = object
+    x*: int
+    y*: int
+    button*: MouseButton
+    mode*: MouseMode
+    action*: MouseButtonAction
+    ctrl*: bool
+    shift*: bool
+    scroll*: bool
+    scrollDir*: ScrollDirection
+    move*: bool
+  MouseMode* {.pure.} = enum
     Disabled, TrackClick, TrackAny
-var gMouseX: int
-var gMouseY: int
-var gMouseMode: MouseMode
-var gMouseButtonAction: MouseButtonAction 
+  MouseButton* {.pure.} = enum
+    ButtonNone, ButtonLeft, ButtonMiddle, ButtonRight
+  ScrollDirection* {.pure.} = enum
+    ScrollNone, ScrollUp, ScrollDown
+
+var gMouseInfo = MouseInfo()
 
 proc getMouse*(): MouseInfo =
-  # -1 because illwill buffer starts at 0 ?
-  return (gMouseX-1, gMouseY-1, gMouseButtonAction, gMouseMode)
+  # -1 because illwill buffer starts at 0.
+  return gMouseInfo
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
 
 func toKey(c: int): Key =
   try:
@@ -299,11 +308,9 @@ func toKey(c: int): Key =
   except RangeError:  # ignore unknown keycodes
     result = Key.None
 
-
 var gIllwillInitialised = false
 var gFullScreen = false
 var gFullRedrawNextFrame = false
-# var gMouse = false
 
 when defined(windows):
   import encodings, unicode, winlean
@@ -428,7 +435,6 @@ else:  # OS X & Linux
     signal(SIGCONT, SIGCONT_handler)
     signal(SIGTSTP, SIGTSTP_handler)
 
-
   proc nonblock(enabled: bool) =
     var ttyState: Termios
 
@@ -449,7 +455,6 @@ else:  # OS X & Linux
     # set the terminal attributes.
     discard tcSetAttr(STDIN_FILENO, TCSANOW, ttyState.addr)
 
-
   proc kbhit(): cint =
     var tv: Timeval
     tv.tv_sec = Time(0)
@@ -460,7 +465,6 @@ else:  # OS X & Linux
     FD_SET(STDIN_FILENO, fds)
     discard select(STDIN_FILENO+1, fds.addr, nil, nil, tv.addr)
     return FD_ISSET(STDIN_FILENO, fds)
-
 
   proc consoleInit() =
     nonblock(true)
@@ -504,21 +508,20 @@ else:  # OS X & Linux
       ord(Key.F12):       @["\e[24~"],
     }.toTable
 
-
   proc splitInputs(inp: openarray[int], max: int): seq[seq[int]] =
-    ## TODO for mouse
+    ## TODO splits the input buffer to extract mouse coordinates
     var parts: seq[seq[int]] = @[]
     var cur: seq[int] = @[]
-    for ii in inp[0..max-1]:
+    for ii in inp[CSI.len+1 .. max-1]:
       if ii == ord('M'): # M
         ## Button press
         parts.add cur
-        gMouseButtonAction = Pressed
+        gMouseInfo.action = Pressed
         break
       elif ii == ord('m'):
         ## Button release
         parts.add cur
-        gMouseButtonAction = Released
+        gMouseInfo.action = Released
         break
       elif ii != ord(';'):
         cur.add ii
@@ -531,15 +534,12 @@ else:  # OS X & Linux
     ## TODO for mouse
     var str = ""
     for ii in inp:
-      # echo ii.chr
       str &= $(ii.chr)
     result = parseInt(str)
-      # result +=  #(ii - 0x32)
 
   proc parseKey(charsRead: int): Key =
     # Inspired by
     # https://github.com/mcandre/charm/blob/master/lib/charm.c
-    # echo keyBuf
     var key = Key.None
     if charsRead == 1:
       let ch = keyBuf[0]
@@ -555,15 +555,29 @@ else:  # OS X & Linux
         key = toKey(ch)
     elif charsRead > 3 and keyBuf[0] == 27 and keyBuf[1] == 91 and keyBuf[2] == 60:
       # echo charsRead
-      let parts = splitInputs(keyBuf, 99) # TODO charsRead is wrong?
-      gMouseX = parts[1].getPos()
-      gMouseY = parts[2].getPos()
-      # echo "MOUSE STUFF ", posX, ":" ,  posY  #, ":", posY #splitInputs(keyBuf)[1].getPos() #cast[uint16](keyBuf[6..7]) #.uint16 # keyBuf[6]-32 , " ", keyBuf[7] - 32
-      # echo ": ", cast[cstring](addr keyBuf), "<"
-      # echo parts
+      let parts = splitInputs(keyBuf, keyBuf.len) # TODO charsRead is wrong?
+      gMouseInfo.x = parts[1].getPos() - 1
+      gMouseInfo.y = parts[2].getPos() - 1
+      let bitset = parts[0].getPos()
+      gMouseInfo.ctrl = bitset.testBit(4)
+      gMouseInfo.shift = bitset.testBit(2)
+      case (bitset.uint8 shl 6 shr 6).int
+      of 0: gMouseInfo.button = MouseButton.ButtonLeft
+      of 1: gMouseInfo.button = MouseButton.ButtonMiddle
+      of 2: gMouseInfo.button = MouseButton.ButtonRight
+      else: gMouseInfo.button = MouseButton.ButtonNone #Left Move sends 3, but we ignore
+      gMouseInfo.scroll = bitset.testBit(6)
+      gMouseInfo.move = bitset.testBit(5)
+
+      # on scroll 3 is reported for mouse button, but no button was pressed
+      if gMouseInfo.scroll:
+        gMouseInfo.button = MouseButton.ButtonNone
+        if bitset.testBit(0): gMouseInfo.scrollDir = ScrollDirection.ScrollDown
+        else: gMouseInfo.scrollDir = ScrollDirection.ScrollUp
+      else:
+        gMouseInfo.scrollDir = ScrollDirection.ScrollNone
       return Key.Mouse
     else:
-      
       var inputSeq = ""
       for i in 0..<charsRead:
         inputSeq &= char(keyBuf[i])
@@ -587,7 +601,6 @@ else:  # OS X & Linux
       result = parseKey(i)
 
   template put(s: string) = stdout.write s
-
 
 when defined(posix):
   const
@@ -621,31 +634,32 @@ proc exitFullScreen() =
     eraseScreen()
     setCursorPos(0, 0)
 
-proc enableMouse(mouseMode: MouseMode) = 
+proc enableMouse(mouseMode: MouseMode) =
   case mouseMode
   of Disabled: discard
-  of TrackAny: stdout.write mouseTrackAnyEvent
-  of TrackClick: stdout.write mouseTrackButtonPress
+  of TrackAny: stdout.write mouseTrackAny
+  of TrackClick: stdout.write mouseTrackButton
 
 proc disableMouse(mouseMode: MouseMode) =
   case mouseMode
   of Disabled: discard
-  of TrackAny: stdout.write disableMouseTrackAnyEvent
-  of TrackClick: stdout.write disableMouseTrackButtonPress
+  of TrackAny: stdout.write disableMouseTrackAny
+  of TrackClick: stdout.write disableMouseTrackButton
 
 proc illwillInit*(fullScreen: bool = true, mouseMode: MouseMode = Disabled) =
   ## Initializes the terminal and enables non-blocking keyboard input. Needs
   ## to be called before doing anything with the library.
   ##
-  ## If `mouse = true` mouse button pressen and releases are tracked
-  ## 
+  ## If `mouseMode = TrackClick` mouse button pressen and releases are tracked
+  ## If `mouseMode = TrackAny` additional to clicks also moves are tracked
+  ##
   ## If the module is already intialised, `IllwillError` is raised.
   if gIllwillInitialised:
     raise newException(IllwillError, "Illwill already initialised")
   gFullScreen = fullScreen
   if gFullScreen: enterFullScreen()
-  gMouseMode = mouseMode
-  enableMouse(gMouseMode)
+  gMouseInfo.mode = mouseMode
+  enableMouse(gMouseInfo.mode)
   consoleInit()
   gIllwillInitialised = true
   resetAttributes()
@@ -661,7 +675,7 @@ proc illwillDeinit*() =
   ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
   if gFullScreen: exitFullScreen()
-  disableMouse(gMouseMode)
+  disableMouse(gMouseInfo.mode)
   consoleDeinit()
   gIllwillInitialised = false
   resetAttributes()
@@ -674,7 +688,6 @@ proc getKey*(): Key =
   ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
   getKeyAsync()
-
 
 type
   TerminalChar* = object
@@ -771,7 +784,6 @@ proc fill*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural, ch: string = " ") =
       for x in x1..xe:
         tb[x, y] = c
 
-
 proc clear*(tb: var TerminalBuffer, ch: string = " ") =
   ## Clears the contents of the terminal buffer with the `ch` character using
   ## the `fgNone` and `bgNone` attributes.
@@ -824,7 +836,6 @@ proc copyFrom*(tb: var TerminalBuffer,
   for yOffs in 0..<h:
     for xOffs in 0..<w:
       tb[xOffs + destX, yOffs + destY] = src[xOffs + srcX, yOffs + srcY]
-
 
 proc copyFrom*(tb: var TerminalBuffer, src: TerminalBuffer) =
   ## Copies the full contents of the `src` terminal buffer into this one.
@@ -921,7 +932,6 @@ proc write*(tb: var TerminalBuffer, s: string) =
   ## the current text attributes.
   write(tb, tb.currX, tb.currY, s)
 
-
 var
   gPrevTerminalBuffer: TerminalBuffer
   gCurrBg: BackgroundColor
@@ -956,7 +966,6 @@ proc setPos(x, y: Natural) =
 
 proc setXPos(x: Natural) =
   terminal.setCursorXPos(x)
-
 
 proc displayFull(tb: TerminalBuffer) =
   var buf = ""
@@ -1013,7 +1022,6 @@ proc displayDiff(tb: TerminalBuffer) =
         bufXPos = x+1
     flushBuf()
 
-
 var gDoubleBufferingEnabled = true
 
 proc setDoubleBuffering*(enabled: bool) =
@@ -1050,7 +1058,6 @@ proc display*(tb: TerminalBuffer) =
     displayFull(tb)
     flushFile(stdout)
     gFullRedrawNextFrame = false
-
 
 type BoxChar = int
 
@@ -1137,7 +1144,6 @@ gBoxCharsUnicode[H_DBL or V_DBL or DOWN or UP or     0 or LEFT] = "╣"
 gBoxCharsUnicode[H_DBL or V_DBL or DOWN or UP or RIGHT or    0] = "╠"
 gBoxCharsUnicode[H_DBL or V_DBL or DOWN or UP or RIGHT or LEFT] = "╬"
 
-
 proc toUTF8String(c: BoxChar): string = gBoxCharsUnicode[c]
 
 type BoxBuffer* = ref object
@@ -1173,7 +1179,6 @@ func `[]`(bb: BoxBuffer, x, y: Natural): BoxChar =
   if x < bb.width and y < bb.height:
     result = bb.buf[bb.width * y + x]
 
-
 proc copyFrom*(bb: var BoxBuffer,
                src: BoxBuffer, srcX, srcY, width, height: Natural,
                destX, destY: Natural) =
@@ -1198,7 +1203,6 @@ proc copyFrom*(bb: var BoxBuffer,
     for xOffs in 0..<w:
       bb[xOffs + destX, yOffs + destY] = src[xOffs + srcX, yOffs + srcY]
 
-
 proc copyFrom*(bb: var BoxBuffer, src: BoxBuffer) =
   ## Copies the full contents of the `src` box buffer into this one.
   ##
@@ -1212,7 +1216,6 @@ proc newBoxBufferFrom*(src: BoxBuffer): BoxBuffer =
   var bb = new BoxBuffer
   bb.copyFrom(src)
   result = bb
-
 
 proc drawHorizLine*(bb: var BoxBuffer, x1, x2, y: Natural,
                     doubleStyle: bool = false, connect: bool = true) =
@@ -1244,7 +1247,6 @@ proc drawHorizLine*(bb: var BoxBuffer, x1, x2, y: Natural,
       if doubleStyle: h = h or H_DBL
       bb[x,y] = h
 
-
 proc drawVertLine*(bb: var BoxBuffer, x, y1, y2: Natural,
                    doubleStyle: bool = false, connect: bool = true) =
   ## Draws a vertical line into the box buffer. Set `doubleStyle` to `true` to
@@ -1273,7 +1275,6 @@ proc drawVertLine*(bb: var BoxBuffer, x, y1, y2: Natural,
       var v = VERT
       if doubleStyle: v = v or V_DBL
       bb[x,y] = v
-
 
 proc drawRect*(bb: var BoxBuffer, x1, y1, x2, y2: Natural,
                doubleStyle: bool = false, connect: bool = true) =
@@ -1308,7 +1309,6 @@ proc drawRect*(bb: var BoxBuffer, x1, y1, x2, y2: Natural,
     if doubleStyle: c = c or V_DBL or H_DBL
     bb[x2,y2] = c
 
-
 proc write*(tb: var TerminalBuffer, bb: var BoxBuffer) =
   ## Writes the contents of the box buffer into this terminal buffer with
   ## the current text attributes.
@@ -1339,7 +1339,6 @@ proc write*(tb: var TerminalBuffer, bb: var BoxBuffer) =
                              fg: tb.currFg, bg: tb.currBg,
                              style: tb.currStyle, forceWrite: forceWrite)
         tb[x,y] = c
-
 
 type
   TerminalCmd* = enum  ## commands that can be expressed as arguments
@@ -1420,7 +1419,6 @@ macro write*(tb: var TerminalBuffer, args: varargs[typed]): untyped =
     for item in args.items:
       result.add(newCall(bindSym"writeProcessArg", tb, item))
 
-
 proc drawHorizLine*(tb: var TerminalBuffer, x1, x2, y: Natural,
                     doubleStyle: bool = false) =
   ## Convenience method to draw a single horizontal line into a terminal
@@ -1443,4 +1441,3 @@ proc drawRect*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural,
   var bb = newBoxBuffer(tb.width, tb.height)
   bb.drawRect(x1, y1, x2, y2, doubleStyle)
   tb.write(bb)
-
