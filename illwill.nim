@@ -580,6 +580,7 @@ else:  # OS X & Linux
 
   proc parseKey(charsRead: int): Key =
     # Inspired by
+
     # https://github.com/mcandre/charm/blob/master/lib/charm.c
     var key = Key.None
     if charsRead == 1:
@@ -597,18 +598,33 @@ else:  # OS X & Linux
     elif charsRead > 3 and keyBuf[0] == 27 and keyBuf[1] == 91 and keyBuf[2] == 60:
       # echo charsRead
       let parts = splitInputs(keyBuf, keyBuf.len) # TODO charsRead is wrong?
+      # echo keyBuf
+      # var ss = ""
+      # for ii in keyBuf:
+      #   ss &= $ii.char
+      # echo repr ss[0..charsRead-1]
+      # echo parts
       gMouseInfo.x = parts[1].getPos() - 1
       gMouseInfo.y = parts[2].getPos() - 1
       let bitset = parts[0].getPos()
+      # echo bitset.toBin(8)
       gMouseInfo.ctrl = bitset.testBit(4)
       gMouseInfo.shift = bitset.testBit(2)
+      gMouseInfo.move = bitset.testBit(5)
+      var oldbut = gMouseInfo.button # need this to fix move and release at same time.
       case (bitset.uint8 shl 6 shr 6).int
       of 0: gMouseInfo.button = MouseButton.ButtonLeft
       of 1: gMouseInfo.button = MouseButton.ButtonMiddle
       of 2: gMouseInfo.button = MouseButton.ButtonRight
-      else: gMouseInfo.button = MouseButton.ButtonNone #Left Move sends 3, but we ignore
+      else:
+        gMouseInfo.action = MouseButtonAction.None
+        gMouseInfo.button = MouseButton.ButtonNone #Left Move sends 3, but we ignore
+
+      ## When moveing then button released we want release
+      if oldbut != MouseButton.ButtonNone and gMouseInfo.button == MouseButton.ButtonNone:
+        gMouseInfo.action = Released
+
       gMouseInfo.scroll = bitset.testBit(6)
-      gMouseInfo.move = bitset.testBit(5)
 
       # on scroll 3 is reported for mouse button, but no button was pressed
       if gMouseInfo.scroll:
