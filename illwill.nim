@@ -447,10 +447,13 @@ else:  # OS X & Linux
     SET_BTN_EVENT_MOUSE = "1002"
     SET_ANY_EVENT_MOUSE = "1003"
     SET_SGR_EXT_MODE_MOUSE = "1006"
+    SET_URXVT_EXT_MODE_MOUSE = "1015"
     ENABLE = "h"
     DISABLE = "l"
     # mouseTrackButton = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{ENABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{ENABLE}"
     mouseTrackAny = fmt"{CSI}?{SET_ANY_EVENT_MOUSE}{ENABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{ENABLE}"
+    # mouseTrackAny = fmt"{CSI}?{SET_ANY_EVENT_MOUSE}{ENABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{ENABLE}{CSI}?{SET_URXVT_EXT_MODE_MOUSE}{ENABLE}"
+
     # disableMouseTrackButton = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{DISABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{DISABLE}"
     disableMouseTrackAny = fmt"{CSI}?{SET_ANY_EVENT_MOUSE}{DISABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{DISABLE}"
 
@@ -611,18 +614,19 @@ else:  # OS X & Linux
       gMouseInfo.ctrl = bitset.testBit(4)
       gMouseInfo.shift = bitset.testBit(2)
       gMouseInfo.move = bitset.testBit(5)
-      var oldbut = gMouseInfo.button # need this to fix move and release at same time.
+      var oldbut = gMouseInfo # need this to fix move and release at same time.
       case (bitset.uint8 shl 6 shr 6).int
       of 0: gMouseInfo.button = MouseButton.ButtonLeft
       of 1: gMouseInfo.button = MouseButton.ButtonMiddle
       of 2: gMouseInfo.button = MouseButton.ButtonRight
       else:
-        gMouseInfo.action = MouseButtonAction.None
+        gMouseInfo.action = MouseButtonAction.None # TODO
         gMouseInfo.button = MouseButton.ButtonNone #Left Move sends 3, but we ignore
 
-      ## When moveing then button released we want release
-      if oldbut != MouseButton.ButtonNone and gMouseInfo.button == MouseButton.ButtonNone:
-        gMouseInfo.action = Released
+      # TODO
+      # ## When moveing then button released we want release
+      # if oldbut != MouseButton.ButtonNone and gMouseInfo.button == MouseButton.ButtonNone:
+      #   gMouseInfo.action = Released
 
       gMouseInfo.scroll = bitset.testBit(6)
 
