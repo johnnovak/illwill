@@ -6,7 +6,7 @@ proc exitProc() {.noconv.} =
   showCursor()
   quit(0)
 
-illwillInit(fullscreen=true, mouseMode = TrackAny)
+illwillInit(fullscreen=true, mouse = true)
 setControlCHook(exitProc)
 hideCursor()
 

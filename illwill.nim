@@ -69,18 +69,6 @@ export terminal.Style
 #define SET_PASTE_QUOTE             2005 /* Quote each char during paste */
 #define SET_PASTE_LITERAL_NL        2006 /* Paste "\n" as C-j */
 
-const
-  CSI = 0x1B.chr & 0x5B.chr
-  SET_BTN_EVENT_MOUSE = "1002"
-  SET_ANY_EVENT_MOUSE = "1003"
-  SET_SGR_EXT_MODE_MOUSE = "1006"
-  ENABLE = "h"
-  DISABLE = "l"
-  mouseTrackButton = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{ENABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{ENABLE}"
-  mouseTrackAny = fmt"{CSI}?{SET_ANY_EVENT_MOUSE}{ENABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{ENABLE}"
-  disableMouseTrackButton = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{DISABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{DISABLE}"
-  disableMouseTrackAny = fmt"{CSI}?{SET_ANY_EVENT_MOUSE}{DISABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{DISABLE}"
-
 type
   ForegroundColor* = enum   ## Foreground colors
     fgNone = 0,             ## default
@@ -281,24 +269,24 @@ type
     x*: int
     y*: int
     button*: MouseButton
-    mode*: MouseMode
+    # mode*: MouseMode
     action*: MouseButtonAction
     ctrl*: bool
     shift*: bool
     scroll*: bool
     scrollDir*: ScrollDirection
     move*: bool
-  MouseMode* {.pure.} = enum
-    Disabled, TrackClick, TrackAny
+  # MouseMode* {.pure.} = enum
+  #   Disabled, TrackClick, TrackAny
   MouseButton* {.pure.} = enum
     ButtonNone, ButtonLeft, ButtonMiddle, ButtonRight
   ScrollDirection* {.pure.} = enum
     ScrollNone, ScrollUp, ScrollDown
 
 var gMouseInfo = MouseInfo()
+var gMouse: bool = false
 
 proc getMouse*(): MouseInfo =
-  # -1 because illwill buffer starts at 0.
   return gMouseInfo
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -325,20 +313,95 @@ when defined(windows):
   proc setConsoleMode(hConsoleHandle: Handle, dwMode: DWORD): WINBOOL {.
       stdcall, dynlib: "kernel32", importc: "SetConsoleMode".}
 
+  # Mouse
+  const
+    ENABLE_MOUSE_INPUT = 0x10
+    ENABLE_WINDOW_INPUT = 0x8
+    ENABLE_QUICK_EDIT_MODE = 0x40
+    ENABLE_EXTENDED_FLAGS = 0x80
+    MOUSE_EVENT = 0x0002
+
+  const
+    FROM_LEFT_1ST_BUTTON_PRESSED = 0x0001
+    FROM_LEFT_2ND_BUTTON_PRESSED = 0x0004
+    FROM_LEFT_3RD_BUTTON_PRESSED = 0x0008
+    FROM_LEFT_4TH_BUTTON_PRESSED = 0x0010
+    RIGHTMOST_BUTTON_PRESSED = 0x0002
+
+  const
+    # CAPSLOCK_ON = 0x0080
+    # #The CAPS LOCK light is on.
+
+    # ENHANCED_KEY = 0x0100
+    # #The key is enhanced.
+
+    # LEFT_ALT_PRESSED = 0x0002
+    # #The left ALT key is pressed.
+
+    LEFT_CTRL_PRESSED = 0x0008
+    #The left CTRL key is pressed.
+
+    # NUMLOCK_ON = 0x0020
+    # #The NUM LOCK light is on.
+
+    # RIGHT_ALT_PRESSED = 0x0001
+    # #The right ALT key is pressed.
+
+    RIGHT_CTRL_PRESSED = 0x0004
+    #The right CTRL key is pressed.
+
+    # SCROLLLOCK_ON = 0x0040
+    # #The SCROLL LOCK light is on.
+
+    SHIFT_PRESSED = 0x0010
+    #The SHIFT key is pressed.
+
+  const
+    # DOUBLE_CLICK = 0x0002
+    # MOUSE_HWHEELED = 0x0008
+    # MOUSE_MOVED = 0x0001
+    MOUSE_WHEELED = 0x0004
+
+  type
+    WCHAR = WinChar
+    CHAR = char
+    BOOL = WINBOOL
+    WORD = uint16
+    UINT = cint
+    SHORT = int16
+
+  include future/m
+
+  type
+    PINPUT_RECORD = ptr array[1024, INPUT_RECORD]
+    LPDWORD = PDWORD
+
+  var gHConsoleInput: HANDLE
+
+  # BOOL WINAPI PeekConsoleInput(
+  #   _In_  HANDLE        hConsoleInput,
+  #   _Out_ PINPUT_RECORD lpBuffer,
+  #   _In_  DWORD         nLength,
+  #   _Out_ LPDWORD       lpNumberOfEventsRead
+  # );
+  proc peekConsoleInputA(hConsoleInput: HANDLE, lpBuffer: PINPUT_RECORD, nLength: DWORD, lpNumberOfEventsRead: LPDWORD): WINBOOL
+    {.stdcall, dynlib: "kernel32", importc: "PeekConsoleInputA".}
+
   const
     ENABLE_WRAP_AT_EOL_OUTPUT   = 0x0002
 
   var gOldConsoleMode: DWORD
 
   proc consoleInit() =
-    if gFullScreen:
-      if getConsoleMode(getStdHandle(STD_OUTPUT_HANDLE),
-                        addr(gOldConsoleMode)) != 0:
+    gHConsoleInput = getStdHandle(STD_OUTPUT_HANDLE)
+    if getConsoleMode(gHConsoleInput,
+                      addr(gOldConsoleMode)) != 0:
+      if gFullScreen:
         var mode = gOldConsoleMode and (not ENABLE_WRAP_AT_EOL_OUTPUT)
-        discard setConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), mode)
+        discard setConsoleMode(gHConsoleInput, mode)
 
   proc consoleDeinit() =
-    discard setConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), gOldConsoleMode)
+    discard setConsoleMode(gHConsoleInput, gOldConsoleMode)
 
 
   func getKeyAsync(): Key =
@@ -396,15 +459,13 @@ when defined(windows):
                     lpReserved: pointer): WINBOOL {.
     stdcall, dynlib: "kernel32", importc: "WriteConsoleW".}
 
-  var hStdout = getStdHandle(STD_OUTPUT_HANDLE)
   var utf16LEConverter = open(destEncoding = "utf-16", srcEncoding = "UTF-8")
 
   proc put(s: string) =
     var us = utf16LEConverter.convert(s)
     var numWritten: DWORD
-    discard writeConsole(hStdout, pointer(us[0].addr), DWORD(s.runeLen),
+    discard writeConsole(gHConsoleInput, pointer(us[0].addr), DWORD(s.runeLen),
                          numWritten.addr, nil)
-
 
 else:  # OS X & Linux
   import posix, tables, termios
@@ -412,6 +473,19 @@ else:  # OS X & Linux
 
   proc consoleInit()
   proc consoleDeinit()
+
+  # Mouse
+  const
+    CSI = 0x1B.chr & 0x5B.chr
+    SET_BTN_EVENT_MOUSE = "1002"
+    SET_ANY_EVENT_MOUSE = "1003"
+    SET_SGR_EXT_MODE_MOUSE = "1006"
+    ENABLE = "h"
+    DISABLE = "l"
+    # mouseTrackButton = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{ENABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{ENABLE}"
+    mouseTrackAny = fmt"{CSI}?{SET_ANY_EVENT_MOUSE}{ENABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{ENABLE}"
+    # disableMouseTrackButton = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{DISABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{DISABLE}"
+    disableMouseTrackAny = fmt"{CSI}?{SET_ANY_EVENT_MOUSE}{DISABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{DISABLE}"
 
   # Adapted from:
   # https://ftp.gnu.org/old-gnu/Manuals/glibc-2.2.3/html_chapter/libc_24.html#SEC499
@@ -634,19 +708,23 @@ proc exitFullScreen() =
     eraseScreen()
     setCursorPos(0, 0)
 
-proc enableMouse(mouseMode: MouseMode) =
-  case mouseMode
-  of Disabled: discard
-  of TrackAny: stdout.write mouseTrackAny
-  of TrackClick: stdout.write mouseTrackButton
+when defined(posix):
+  proc enableMouse() =
+    stdout.write mouseTrackAny
+    stdout.flushFile()
 
-proc disableMouse(mouseMode: MouseMode) =
-  case mouseMode
-  of Disabled: discard
-  of TrackAny: stdout.write disableMouseTrackAny
-  of TrackClick: stdout.write disableMouseTrackButton
+  proc disableMouse() =
+    stdout.write disableMouseTrackAny
+    stdout.flushFile()
+else:
+  proc enableMouse(hConsoleInput: Handle, oldConsoleMode: DWORD) =
+    discard setConsoleMode(hConsoleInput, ENABLE_WINDOW_INPUT or ENABLE_MOUSE_INPUT or ENABLE_EXTENDED_FLAGS or (oldConsoleMode and ENABLE_QUICK_EDIT_MODE.bitnot()))
 
-proc illwillInit*(fullScreen: bool = true, mouseMode: MouseMode = Disabled) =
+  proc disableMouse(hConsoleInput: Handle, oldConsoleMode: DWORD) =
+    discard setConsoleMode(hConsoleInput,  oldConsoleMode)
+
+
+proc illwillInit*(fullScreen: bool = true, mouse: bool = false) =
   ## Initializes the terminal and enables non-blocking keyboard input. Needs
   ## to be called before doing anything with the library.
   ##
@@ -658,9 +736,13 @@ proc illwillInit*(fullScreen: bool = true, mouseMode: MouseMode = Disabled) =
     raise newException(IllwillError, "Illwill already initialised")
   gFullScreen = fullScreen
   if gFullScreen: enterFullScreen()
-  gMouseInfo.mode = mouseMode
-  enableMouse(gMouseInfo.mode)
+
   consoleInit()
+  if mouse:
+    when defined(posix):
+      enableMouse(gMouseInfo.mode)
+    else:
+      gHConsoleInput.enableMouse(gOldConsoleMode)
   gIllwillInitialised = true
   resetAttributes()
 
@@ -675,7 +757,11 @@ proc illwillDeinit*() =
   ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
   if gFullScreen: exitFullScreen()
-  disableMouse(gMouseInfo.mode)
+  if gMouse:
+    when defined(posix):
+      disableMouse(gMouseInfo.mode)
+    else:
+      gHConsoleInput.disableMouse(gOldConsoleMode)
   consoleDeinit()
   gIllwillInitialised = false
   resetAttributes()
