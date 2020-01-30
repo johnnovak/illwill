@@ -13,6 +13,7 @@
 ## * Full-screen support with restoring the contents of the terminal after
 ##   exit (restoring works only on POSIX)
 ## * Basic suspend/continue (`SIGTSTP`, `SIGCONT`) support on POSIX
+## * Basic mouse support.
 ##
 ## The module depends only on the standard `terminal
 ## <https://nim-lang.org/docs/terminal.html>`_ module. However, you
@@ -40,34 +41,6 @@ export terminal.terminalSize
 export terminal.hideCursor
 export terminal.showCursor
 export terminal.Style
-
-# TODO mouse
-# https://de.wikipedia.org/wiki/ANSI-Escapesequenz
-# https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Extended-coordinates
-# /* DECSET arguments for turning on mouse reporting modes */
-#define SET_X10_MOUSE               9
-#define SET_VT200_MOUSE             1000
-#define SET_VT200_HIGHLIGHT_MOUSE   1001
-#define SET_BTN_EVENT_MOUSE         1002
-#define SET_ANY_EVENT_MOUSE         1003
-
-#if OPT_FOCUS_EVENT
-#define SET_FOCUS_EVENT_MOUSE       1004 /* can be combined with above */
-#endif
-
-# /* Extend mouse tracking for terminals wider(taller) than 223 cols(rows) */
-#define SET_EXT_MODE_MOUSE          1005 /* compatible with above */
-#define SET_SGR_EXT_MODE_MOUSE      1006
-#define SET_URXVT_EXT_MODE_MOUSE    1015
-
-#define SET_ALTERNATE_SCROLL        1007 /* wheel mouse may send cursor-keys */
-
-#define SET_BUTTON1_MOVE_POINT      2001 /* click1 emit Esc seq to move point*/
-#define SET_BUTTON2_MOVE_POINT      2002 /* press2 emit Esc seq to move point*/
-#define SET_DBUTTON3_DELETE         2003 /* Double click-3 deletes */
-#define SET_PASTE_IN_BRACKET        2004 /* Surround paste by escapes */
-#define SET_PASTE_QUOTE             2005 /* Quote each char during paste */
-#define SET_PASTE_LITERAL_NL        2006 /* Paste "\n" as C-j */
 
 type
   ForegroundColor* = enum   ## Foreground colors
@@ -264,16 +237,15 @@ type
   MouseButtonAction* {.pure.} = enum
     None, Pressed, Released
   MouseInfo* = object
-    x*: int
-    y*: int
-    button*: MouseButton
-    # mode*: MouseMode
-    action*: MouseButtonAction
-    ctrl*: bool
-    shift*: bool
-    scroll*: bool
+    x*: int ## x mouse position
+    y*: int ## y mouse position
+    button*: MouseButton ## which button was pressed
+    action*: MouseButtonAction ## if button was released or pressed
+    ctrl*: bool ## was ctrl down on event
+    shift*: bool ## was shift down on event
+    scroll*: bool ## if this is a mouse scroll
     scrollDir*: ScrollDirection
-    move*: bool
+    move*: bool ## is this a mouse move
   MouseButton* {.pure.} = enum
     ButtonNone, ButtonLeft, ButtonMiddle, ButtonRight
   ScrollDirection* {.pure.} = enum
@@ -284,6 +256,8 @@ var gMouseInfo = MouseInfo()
 var gMouse: bool = false
 
 proc getMouse*(): MouseInfo =
+  ## when illwillInit(mouse = true) all mouse movements and clicks.
+  ## call getMouse() to get the mouse informations.
   return gMouseInfo
 
 func toKey(c: int): Key =
@@ -341,18 +315,56 @@ when defined(windows):
     UINT = cint
     SHORT = int16
 
-  include future/m
+  # The windows console input structures.
+  type
+    KEY_EVENT_RECORD_UNION* {.bycopy.} = object {.union.}
+      UnicodeChar*: WCHAR
+      AsciiChar*: CHAR
+
+    INPUT_RECORD_UNION* {.bycopy.} = object {.union.}
+      KeyEvent*: KEY_EVENT_RECORD
+      MouseEvent*: MOUSE_EVENT_RECORD
+      WindowBufferSizeEvent*: WINDOW_BUFFER_SIZE_RECORD
+      MenuEvent*: MENU_EVENT_RECORD
+      FocusEvent*: FOCUS_EVENT_RECORD
+
+    COORD* {.bycopy.} = object
+      X*: SHORT
+      Y*: SHORT
+
+    PCOORD* = ptr COORD
+    FOCUS_EVENT_RECORD* {.bycopy.} = object
+      bSetFocus*: BOOL
+
+    KEY_EVENT_RECORD* {.bycopy.} = object
+      bKeyDown*: BOOL
+      wRepeatCount*: WORD
+      wVirtualKeyCode*: WORD
+      wVirtualScanCode*: WORD
+      uChar*: KEY_EVENT_RECORD_UNION
+      dwControlKeyState*: DWORD
+
+    MENU_EVENT_RECORD* {.bycopy.} = object
+      dwCommandId*: UINT
+
+    PMENU_EVENT_RECORD* = ptr MENU_EVENT_RECORD
+    MOUSE_EVENT_RECORD* {.bycopy.} = object
+      dwMousePosition*: COORD
+      dwButtonState*: DWORD
+      dwControlKeyState*: DWORD
+      dwEventFlags*: DWORD
+
+    WINDOW_BUFFER_SIZE_RECORD* {.bycopy.} = object
+      dwSize*: COORD
+
+    INPUT_RECORD* {.bycopy.} = object
+      EventType*: WORD
+      Event*: INPUT_RECORD_UNION
 
   type
     PINPUT_RECORD = ptr array[inputBufferLen, INPUT_RECORD]
     LPDWORD = PDWORD
 
-  # BOOL WINAPI PeekConsoleInput(
-  #   _In_  HANDLE        hConsoleInput,
-  #   _Out_ PINPUT_RECORD lpBuffer,
-  #   _In_  DWORD         nLength,
-  #   _Out_ LPDWORD       lpNumberOfEventsRead
-  # );
   proc peekConsoleInputA(hConsoleInput: HANDLE, lpBuffer: PINPUT_RECORD, nLength: DWORD, lpNumberOfEventsRead: LPDWORD): WINBOOL
     {.stdcall, dynlib: "kernel32", importc: "PeekConsoleInputA".}
 
@@ -442,6 +454,8 @@ else:  # OS X & Linux
   proc consoleDeinit()
 
   # Mouse
+  # https://de.wikipedia.org/wiki/ANSI-Escapesequenz
+  # https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Extended-coordinates
   const
     CSI = 0x1B.chr & 0x5B.chr
     SET_BTN_EVENT_MOUSE = "1002"
@@ -450,11 +464,7 @@ else:  # OS X & Linux
     SET_URXVT_EXT_MODE_MOUSE = "1015"
     ENABLE = "h"
     DISABLE = "l"
-    # mouseTrackButton = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{ENABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{ENABLE}"
     mouseTrackAny = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{ENABLE}{CSI}?{SET_ANY_EVENT_MOUSE}{ENABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{ENABLE}"
-    # mouseTrackAny = fmt"{CSI}?{SET_ANY_EVENT_MOUSE}{ENABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{ENABLE}{CSI}?{SET_URXVT_EXT_MODE_MOUSE}{ENABLE}"
-
-    # disableMouseTrackButton = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{DISABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{DISABLE}"
     disableMouseTrackAny = fmt"{CSI}?{SET_ANY_EVENT_MOUSE}{DISABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{DISABLE}"
 
   # Adapted from:
@@ -553,11 +563,11 @@ else:  # OS X & Linux
     }.toTable
 
   proc splitInputs(inp: openarray[int], max: int): seq[seq[int]] =
-    ## TODO splits the input buffer to extract mouse coordinates
+    ## splits the input buffer to extract mouse coordinates
     var parts: seq[seq[int]] = @[]
     var cur: seq[int] = @[]
     for ii in inp[CSI.len+1 .. max-1]:
-      if ii == ord('M'): # M
+      if ii == ord('M'):
         ## Button press
         parts.add cur
         gMouseInfo.action = Pressed
@@ -575,15 +585,37 @@ else:  # OS X & Linux
     return parts
 
   proc getPos(inp: seq[int]): int =
-    ## TODO for mouse
     var str = ""
     for ii in inp:
       str &= $(ii.chr)
     result = parseInt(str)
 
+  proc fillGlobalMouseInfo(keyBuf: array[KeySequenceMaxLen, int]) =
+    let parts = splitInputs(keyBuf, keyBuf.len) # TODO charsRead is wrong?
+    gMouseInfo.x = parts[1].getPos() - 1
+    gMouseInfo.y = parts[2].getPos() - 1
+    let bitset = parts[0].getPos()
+    gMouseInfo.ctrl = bitset.testBit(4)
+    gMouseInfo.shift = bitset.testBit(2)
+    gMouseInfo.move = bitset.testBit(5)
+    case (bitset.uint8 shl 6 shr 6).int
+    of 0: gMouseInfo.button = MouseButton.ButtonLeft
+    of 1: gMouseInfo.button = MouseButton.ButtonMiddle
+    of 2: gMouseInfo.button = MouseButton.ButtonRight
+    else:
+      gMouseInfo.action = MouseButtonAction.None
+      gMouseInfo.button = MouseButton.ButtonNone #Left Move sends 3, but we ignore
+    gMouseInfo.scroll = bitset.testBit(6)
+    if gMouseInfo.scroll:
+      # on scroll button=3 is reported, but we want no button pressed
+      gMouseInfo.button = MouseButton.ButtonNone
+      if bitset.testBit(0): gMouseInfo.scrollDir = ScrollDirection.ScrollDown
+      else: gMouseInfo.scrollDir = ScrollDirection.ScrollUp
+    else:
+      gMouseInfo.scrollDir = ScrollDirection.ScrollNone
+
   proc parseKey(charsRead: int): Key =
     # Inspired by
-
     # https://github.com/mcandre/charm/blob/master/lib/charm.c
     var key = Key.None
     if charsRead == 1:
@@ -598,46 +630,11 @@ else:  # OS X & Linux
                                   # we'll ignore them
       else:
         key = toKey(ch)
+
     elif charsRead > 3 and keyBuf[0] == 27 and keyBuf[1] == 91 and keyBuf[2] == 60:
-      # echo charsRead
-      let parts = splitInputs(keyBuf, keyBuf.len) # TODO charsRead is wrong?
-      # echo keyBuf
-      # var ss = ""
-      # for ii in keyBuf:
-      #   ss &= $ii.char
-      # echo repr ss[0..charsRead-1]
-      # echo parts
-      gMouseInfo.x = parts[1].getPos() - 1
-      gMouseInfo.y = parts[2].getPos() - 1
-      let bitset = parts[0].getPos()
-      # echo bitset.toBin(8)
-      gMouseInfo.ctrl = bitset.testBit(4)
-      gMouseInfo.shift = bitset.testBit(2)
-      gMouseInfo.move = bitset.testBit(5)
-      var oldbut = gMouseInfo # need this to fix move and release at same time.
-      case (bitset.uint8 shl 6 shr 6).int
-      of 0: gMouseInfo.button = MouseButton.ButtonLeft
-      of 1: gMouseInfo.button = MouseButton.ButtonMiddle
-      of 2: gMouseInfo.button = MouseButton.ButtonRight
-      else:
-        gMouseInfo.action = MouseButtonAction.None # TODO
-        gMouseInfo.button = MouseButton.ButtonNone #Left Move sends 3, but we ignore
-
-      # TODO
-      # ## When moveing then button released we want release
-      # if oldbut != MouseButton.ButtonNone and gMouseInfo.button == MouseButton.ButtonNone:
-      #   gMouseInfo.action = Released
-
-      gMouseInfo.scroll = bitset.testBit(6)
-
-      # on scroll 3 is reported for mouse button, but no button was pressed
-      if gMouseInfo.scroll:
-        gMouseInfo.button = MouseButton.ButtonNone
-        if bitset.testBit(0): gMouseInfo.scrollDir = ScrollDirection.ScrollDown
-        else: gMouseInfo.scrollDir = ScrollDirection.ScrollUp
-      else:
-        gMouseInfo.scrollDir = ScrollDirection.ScrollNone
+      fillGlobalMouseInfo(keyBuf)
       return Key.Mouse
+
     else:
       var inputSeq = ""
       for i in 0..<charsRead:
@@ -719,8 +716,7 @@ proc illwillInit*(fullScreen: bool = true, mouse: bool = false) =
   ## Initializes the terminal and enables non-blocking keyboard input. Needs
   ## to be called before doing anything with the library.
   ##
-  ## If `mouseMode = TrackClick` mouse button pressen and releases are tracked
-  ## If `mouseMode = TrackAny` additional to clicks also moves are tracked
+  ## If `mouse = true` all mouse moves are tracked see `getMouse()`
   ##
   ## If the module is already intialised, `IllwillError` is raised.
   if gIllwillInitialised:
