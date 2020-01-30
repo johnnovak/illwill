@@ -1,6 +1,6 @@
 import winlean
 import bitops
-import illwill
+# import illwill
 
 const
   ENABLE_MOUSE_INPUT* = 0x10
@@ -95,94 +95,107 @@ proc disableMouse(hConsoleInput: Handle, prevMode: DWORD) =
 when isMainModule:
   import os
 
-  illwillInit(fullscreen=true, mouse = true)
-  hideCursor()
+  # illwillInit(fullscreen=true, mouse = true)
+  # hideCursor()
 
-  var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
+  # var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
 
-  # var hConsoleInput: HANDLE = getStdHandle(STD_INPUT_HANDLE)
+  var hConsoleInput: HANDLE = getStdHandle(STD_INPUT_HANDLE)
   var buffer: array[1024, INPUT_RECORD]
   var numberOfEventsRead: DWORD
   var prevMode: DWORD
 
   # if GetConsoleMode(hConsoleInput, addr prevMode) == 0:
-  #   echo getLastError()
+    # echo getLastError()
 
-  # hConsoleInput.enableMouse(prevMode)
+  hConsoleInput.enableMouse(prevMode)
 
   var idx = 0
-  var lastMi: MouseInfo
+  # var lastMi: MouseInfo
   while true:
-    if PeekConsoleInputA(hConsoleInput, addr buffer, buffer.len.DWORD, addr numberOfEventsRead) == 0:
-      echo getLastError()
+    # if PeekConsoleInputA(hConsoleInput, addr buffer, buffer.len.DWORD, addr numberOfEventsRead) == 0:
+    #   echo getLastError()
 
-    if readConsoleInput(hConsoleInput, addr buffer, buffer.len.DWORD, addr numberOfEventsRead) == 0:
-      echo getLastError()
+    # if readConsoleInput(hConsoleInput, addr buffer, buffer.len.DWORD, addr numberOfEventsRead) == 0:
+    #   echo getLastError()
 
+    # if readConsoleInput(hConsoleInput, addr buffer, 1.DWORD, addr numberOfEventsRead) == 0:
+    #   echo getLastError()
+
+    discard PeekConsoleInputA(hConsoleInput, addr buffer, buffer.len.DWORD, addr numberOfEventsRead)
+    var toRead = 0
     for elem in buffer[0..numberOfEventsRead.int-1]:
       # Filter for only MOUSE_EVENT
-      if elem.EventType != MOUSE_EVENT: continue
-
-      tb.write 0, 3, "MOUSE EVENT " & $idx
-
-      var mi = MouseInfo()
-      mi.x = elem.Event.MouseEvent.dwMousePosition.X
-      mi.y = elem.Event.MouseEvent.dwMousePosition.Y
-
-      case elem.Event.MouseEvent.dwButtonState
-      of FROM_LEFT_1ST_BUTTON_PRESSED:
-        mi.button = ButtonLeft
-      of FROM_LEFT_2ND_BUTTON_PRESSED:
-        mi.button = ButtonMiddle
-      of RIGHTMOST_BUTTON_PRESSED:
-        mi.button = ButtonRight
-      else:
-        mi.button = ButtonNone
-
-      if lastMi.button == ButtonNone and mi.button != ButtonNone:
-        mi.action = MouseButtonAction.Pressed
-      else:
-        mi.action = MouseButtonAction.Released
-
-      # if bitand(elem.Event.MouseEvent.dwEventFlags, MOUSE_MOVED) == MOUSE_MOVED:
-      #   mi.move = true
-      # else:
-      #   mi.move = false
-      if lastMi.x != mi.x or lastMi.y != mi.y:
-        mi.move = true
-      else:
-        mi.move = false
-
-      if bitand(elem.Event.MouseEvent.dwEventFlags, MOUSE_WHEELED) == MOUSE_WHEELED:
-        mi.scroll = true
-        if elem.Event.MouseEvent.dwButtonState.testBit(31):
-          mi.scrollDir = ScrollDirection.ScrollDown
-        else:
-          mi.scrollDir = ScrollDirection.ScrollUp
-      else:
-        mi.scroll = false
+      toRead.inc()
+      if elem.EventType == MOUSE_EVENT: break
+    if toRead == 0: continue
+    discard readConsoleInput(hConsoleInput, addr buffer, toRead.DWORD, addr numberOfEventsRead)
+    assert toRead == numberOfEventsRead
+    if buffer[numberOfEventsRead - 1].EventType == MOUSE_EVENT:
+      echo buffer[numberOfEventsRead - 1]
 
 
-      if bitand(elem.Event.MouseEvent.dwControlKeyState, LEFT_CTRL_PRESSED) == LEFT_CTRL_PRESSED or
-         bitand(elem.Event.MouseEvent.dwControlKeyState, RIGHT_CTRL_PRESSED) == RIGHT_CTRL_PRESSED:
-        mi.ctrl = true
-      else:
-        mi.ctrl = false
 
-      if bitand(elem.Event.MouseEvent.dwControlKeyState, SHIFT_PRESSED) == SHIFT_PRESSED:
-        mi.shift = true
-      else:
-        mi.shift = false
+  #     tb.write 0, 3, "MOUSE EVENT " & $idx
 
-      tb.write 0, 1, $lastMi
+  #     var mi = MouseInfo()
+  #     mi.x = elem.Event.MouseEvent.dwMousePosition.X
+  #     mi.y = elem.Event.MouseEvent.dwMousePosition.Y
 
-      lastMi = mi
+  #     case elem.Event.MouseEvent.dwButtonState
+  #     of FROM_LEFT_1ST_BUTTON_PRESSED:
+  #       mi.button = ButtonLeft
+  #     of FROM_LEFT_2ND_BUTTON_PRESSED:
+  #       mi.button = ButtonMiddle
+  #     of RIGHTMOST_BUTTON_PRESSED:
+  #       mi.button = ButtonRight
+  #     else:
+  #       mi.button = ButtonNone
 
-      tb.write 0, 2, $mi
-      tb.display()
+  #     if lastMi.button == ButtonNone and mi.button != ButtonNone:
+  #       mi.action = MouseButtonAction.Pressed
+  #     else:
+  #       mi.action = MouseButtonAction.Released
 
-    idx.inc
-    if idx == 100: break
-    sleep(50)
+  #     # if bitand(elem.Event.MouseEvent.dwEventFlags, MOUSE_MOVED) == MOUSE_MOVED:
+  #     #   mi.move = true
+  #     # else:
+  #     #   mi.move = false
+  #     if lastMi.x != mi.x or lastMi.y != mi.y:
+  #       mi.move = true
+  #     else:
+  #       mi.move = false
 
-  # hConsoleInput.disableMouse(prevMode)
+  #     if bitand(elem.Event.MouseEvent.dwEventFlags, MOUSE_WHEELED) == MOUSE_WHEELED:
+  #       mi.scroll = true
+  #       if elem.Event.MouseEvent.dwButtonState.testBit(31):
+  #         mi.scrollDir = ScrollDirection.ScrollDown
+  #       else:
+  #         mi.scrollDir = ScrollDirection.ScrollUp
+  #     else:
+  #       mi.scroll = false
+
+
+  #     if bitand(elem.Event.MouseEvent.dwControlKeyState, LEFT_CTRL_PRESSED) == LEFT_CTRL_PRESSED or
+  #        bitand(elem.Event.MouseEvent.dwControlKeyState, RIGHT_CTRL_PRESSED) == RIGHT_CTRL_PRESSED:
+  #       mi.ctrl = true
+  #     else:
+  #       mi.ctrl = false
+
+  #     if bitand(elem.Event.MouseEvent.dwControlKeyState, SHIFT_PRESSED) == SHIFT_PRESSED:
+  #       mi.shift = true
+  #     else:
+  #       mi.shift = false
+
+  #     tb.write 0, 1, $lastMi
+
+  #     lastMi = mi
+
+  #     tb.write 0, 2, $mi
+  #     tb.display()
+
+  #   idx.inc
+  #   if idx == 100: break
+  #   sleep(50)
+
+  hConsoleInput.disableMouse(prevMode)
