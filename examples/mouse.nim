@@ -19,7 +19,7 @@ while true:
   of Key.Escape, Key.Q: exitProc()
   of Key.Mouse:
     let mi = getMouse()
-    if mi.action == MouseButtonAction.Pressed:
+    if mi.action == MouseButtonAction.ActionPressed:
       case mi.button
       of ButtonLeft:
         if mi.ctrl:
@@ -31,7 +31,7 @@ while true:
       of ButtonRight:
         tb.write mi.x, mi.y, fgCyan, "#"
       else: discard
-    else:
+    elif mi.action == MouseButtonAction.ActionReleased:
       tb.write mi.x, mi.y, "^"
   else:
     echo key

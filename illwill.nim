@@ -235,17 +235,17 @@ type
 
 type
   MouseButtonAction* {.pure.} = enum
-    None, Pressed, Released
+    ActionNone, ActionPressed, ActionReleased
   MouseInfo* = object
     x*: int ## x mouse position
     y*: int ## y mouse position
     button*: MouseButton ## which button was pressed
     action*: MouseButtonAction ## if button was released or pressed
-    ctrl*: bool ## was ctrl down on event
-    shift*: bool ## was shift down on event
+    ctrl*: bool ## was ctrl was down on event
+    shift*: bool ## was shift was down on event
     scroll*: bool ## if this is a mouse scroll
     scrollDir*: ScrollDirection
-    move*: bool ## is this a mouse move
+    move*: bool ## if this a mouse move
   MouseButton* {.pure.} = enum
     ButtonNone, ButtonLeft, ButtonMiddle, ButtonRight
   ScrollDirection* {.pure.} = enum
@@ -256,8 +256,27 @@ var gMouseInfo = MouseInfo()
 var gMouse: bool = false
 
 proc getMouse*(): MouseInfo =
-  ## when illwillInit(mouse = true) all mouse movements and clicks.
-  ## call getMouse() to get the mouse informations.
+  ## when `illwillInit(mouse = true)` all mouse movements and clicks are captured.
+  ## call this to get the actual mouse informations. Also see `MouseInfo`.
+  ##
+  ## Example:
+  ##
+  ## .. code-block::
+  ##
+  ##   import illwill, os
+  ##
+  ##   illwillInit(fullscreen = true, mouse = true)
+  ##   hideCursor()
+  ##
+  ##   var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
+  ##   while true:
+  ##     var key = getKey()
+  ##     if key == Key.Mouse:
+  ##       let mi = getMouse()
+  ##       if mi.action == MouseButtonAction.ActionPressed:
+  ##         tb.write mi.x, mi.y, fgRed, styleBright, "♥"
+  ##     tb.display()
+  ##     sleep(20)
   return gMouseInfo
 
 func toKey(c: int): Key =
@@ -570,12 +589,12 @@ else:  # OS X & Linux
       if ii == ord('M'):
         ## Button press
         parts.add cur
-        gMouseInfo.action = Pressed
+        gMouseInfo.action = ActionPressed
         break
       elif ii == ord('m'):
         ## Button release
         parts.add cur
-        gMouseInfo.action = Released
+        gMouseInfo.action = ActionReleased
         break
       elif ii != ord(';'):
         cur.add ii
@@ -603,7 +622,7 @@ else:  # OS X & Linux
     of 1: gMouseInfo.button = MouseButton.ButtonMiddle
     of 2: gMouseInfo.button = MouseButton.ButtonRight
     else:
-      gMouseInfo.action = MouseButtonAction.None
+      gMouseInfo.action = MouseButtonAction.ActionNone
       gMouseInfo.button = MouseButton.ButtonNone #Left Move sends 3, but we ignore
     gMouseInfo.scroll = bitset.testBit(6)
     if gMouseInfo.scroll:
@@ -824,6 +843,9 @@ when defined(windows):
 proc getKey*(): Key =
   ## Reads the next keystroke in a non-blocking manner. If there are no
   ## keypress events in the buffer, `Key.None` is returned.
+  ##
+  ## If a mouse event was captured `Key.Mouse` is returned.
+  ## Call `getMouse()` to get the MouseInfo.
   ##
   ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
