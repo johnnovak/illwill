@@ -6,7 +6,7 @@ proc exitProc() {.noconv.} =
   showCursor()
   quit(0)
 
-illwillInit(fullscreen=true, mouseMode = TrackAny)
+illwillInit(fullscreen=true, mouse = true)
 setControlCHook(exitProc)
 hideCursor()
 
@@ -14,6 +14,7 @@ var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
 
 while true:
   var key = getKey()
+  tb.write(0,0, $key)
   case key
   of Key.None: discard
   of Key.Escape, Key.Q: exitProc()
