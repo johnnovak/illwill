@@ -712,7 +712,7 @@ proc illwillInit*(fullScreen: bool = true, mouse: bool = false) =
   gMouse = mouse
   if gMouse:
     when defined(posix):
-      enableMouse(gMouseInfo.mode)
+      enableMouse()
     else:
       enableMouse(getStdHandle(STD_INPUT_HANDLE))
   gIllwillInitialised = true
@@ -731,7 +731,7 @@ proc illwillDeinit*() =
   if gFullScreen: exitFullScreen()
   if gMouse:
     when defined(posix):
-      disableMouse(gMouseInfo.mode)
+      disableMouse()
     else:
       disableMouse(getStdHandle(STD_INPUT_HANDLE), gOldConsoleModeInput)
   consoleDeinit()
@@ -739,70 +739,71 @@ proc illwillDeinit*() =
   resetAttributes()
   showCursor()
 
-proc fillGlobalMouseInfo(inputRecord: INPUT_RECORD) =
-  gMouseInfo.x = inputRecord.Event.MouseEvent.dwMousePosition.X
-  gMouseInfo.y = inputRecord.Event.MouseEvent.dwMousePosition.Y
+when defined(windows):
+  proc fillGlobalMouseInfo(inputRecord: INPUT_RECORD) =
+    gMouseInfo.x = inputRecord.Event.MouseEvent.dwMousePosition.X
+    gMouseInfo.y = inputRecord.Event.MouseEvent.dwMousePosition.Y
 
-  case inputRecord.Event.MouseEvent.dwButtonState
-  of FROM_LEFT_1ST_BUTTON_PRESSED:
-    gMouseInfo.button = ButtonLeft
-  of FROM_LEFT_2ND_BUTTON_PRESSED:
-    gMouseInfo.button = ButtonMiddle
-  of RIGHTMOST_BUTTON_PRESSED:
-    gMouseInfo.button = ButtonRight
-  else:
-    gMouseInfo.button = ButtonNone
-
-  if gMouseInfo.button != ButtonNone:
-    gMouseInfo.action = MouseButtonAction.Pressed
-  elif gMouseInfo.button == ButtonNone and gLastMouseInfo.button != ButtonNone:
-    gMouseInfo.action = MouseButtonAction.Released
-  else:
-    gMouseInfo.action = MouseButtonAction.None
-
-  if gLastMouseInfo.x != gMouseInfo.x or gLastMouseInfo.y != gMouseInfo.y:
-    gMouseInfo.move = true
-  else:
-    gMouseInfo.move = false
-
-  if bitand(inputRecord.Event.MouseEvent.dwEventFlags, MOUSE_WHEELED) == MOUSE_WHEELED:
-    gMouseInfo.scroll = true
-    if inputRecord.Event.MouseEvent.dwButtonState.testBit(31):
-      gMouseInfo.scrollDir = ScrollDirection.ScrollDown
+    case inputRecord.Event.MouseEvent.dwButtonState
+    of FROM_LEFT_1ST_BUTTON_PRESSED:
+      gMouseInfo.button = ButtonLeft
+    of FROM_LEFT_2ND_BUTTON_PRESSED:
+      gMouseInfo.button = ButtonMiddle
+    of RIGHTMOST_BUTTON_PRESSED:
+      gMouseInfo.button = ButtonRight
     else:
-      gMouseInfo.scrollDir = ScrollDirection.ScrollUp
-  else:
-    gMouseInfo.scroll = false
+      gMouseInfo.button = ButtonNone
 
-  if bitand(inputRecord.Event.MouseEvent.dwControlKeyState, LEFT_CTRL_PRESSED) == LEFT_CTRL_PRESSED or
-      bitand(inputRecord.Event.MouseEvent.dwControlKeyState, RIGHT_CTRL_PRESSED) == RIGHT_CTRL_PRESSED:
-    gMouseInfo.ctrl = true
-  else:
-    gMouseInfo.ctrl = false
+    if gMouseInfo.button != ButtonNone:
+      gMouseInfo.action = MouseButtonAction.Pressed
+    elif gMouseInfo.button == ButtonNone and gLastMouseInfo.button != ButtonNone:
+      gMouseInfo.action = MouseButtonAction.Released
+    else:
+      gMouseInfo.action = MouseButtonAction.None
 
-  if bitand(inputRecord.Event.MouseEvent.dwControlKeyState, SHIFT_PRESSED) == SHIFT_PRESSED:
-    gMouseInfo.shift = true
-  else:
-    gMouseInfo.shift = false
+    if gLastMouseInfo.x != gMouseInfo.x or gLastMouseInfo.y != gMouseInfo.y:
+      gMouseInfo.move = true
+    else:
+      gMouseInfo.move = false
 
-  gLastMouseInfo = gMouseInfo
+    if bitand(inputRecord.Event.MouseEvent.dwEventFlags, MOUSE_WHEELED) == MOUSE_WHEELED:
+      gMouseInfo.scroll = true
+      if inputRecord.Event.MouseEvent.dwButtonState.testBit(31):
+        gMouseInfo.scrollDir = ScrollDirection.ScrollDown
+      else:
+        gMouseInfo.scrollDir = ScrollDirection.ScrollUp
+    else:
+      gMouseInfo.scroll = false
 
-proc hasMouseInput(): bool =
-  var buffer: array[inputBufferLen, INPUT_RECORD]
-  var numberOfEventsRead: DWORD
-  var toRead: int = 0
-  discard peekConsoleInputA(getStdHandle(STD_INPUT_HANDLE), addr buffer, buffer.len.DWORD, addr numberOfEventsRead)
-  if numberOfEventsRead == 0: return false
-  for inputRecord in buffer[0..numberOfEventsRead.int-1]:
-    toRead.inc()
-    if inputRecord.EventType == MOUSE_EVENT: break
-  if toRead == 0: return false
-  discard readConsoleInput(getStdHandle(STD_INPUT_HANDLE), addr buffer, toRead.DWORD, addr numberOfEventsRead)
-  if buffer[numberOfEventsRead - 1].EventType == MOUSE_EVENT:
-    fillGlobalMouseInfo(buffer[numberOfEventsRead - 1])
-    return true
-  else:
-    return false
+    if bitand(inputRecord.Event.MouseEvent.dwControlKeyState, LEFT_CTRL_PRESSED) == LEFT_CTRL_PRESSED or
+        bitand(inputRecord.Event.MouseEvent.dwControlKeyState, RIGHT_CTRL_PRESSED) == RIGHT_CTRL_PRESSED:
+      gMouseInfo.ctrl = true
+    else:
+      gMouseInfo.ctrl = false
+
+    if bitand(inputRecord.Event.MouseEvent.dwControlKeyState, SHIFT_PRESSED) == SHIFT_PRESSED:
+      gMouseInfo.shift = true
+    else:
+      gMouseInfo.shift = false
+
+    gLastMouseInfo = gMouseInfo
+
+  proc hasMouseInput(): bool =
+    var buffer: array[inputBufferLen, INPUT_RECORD]
+    var numberOfEventsRead: DWORD
+    var toRead: int = 0
+    discard peekConsoleInputA(getStdHandle(STD_INPUT_HANDLE), addr buffer, buffer.len.DWORD, addr numberOfEventsRead)
+    if numberOfEventsRead == 0: return false
+    for inputRecord in buffer[0..numberOfEventsRead.int-1]:
+      toRead.inc()
+      if inputRecord.EventType == MOUSE_EVENT: break
+    if toRead == 0: return false
+    discard readConsoleInput(getStdHandle(STD_INPUT_HANDLE), addr buffer, toRead.DWORD, addr numberOfEventsRead)
+    if buffer[numberOfEventsRead - 1].EventType == MOUSE_EVENT:
+      fillGlobalMouseInfo(buffer[numberOfEventsRead - 1])
+      return true
+    else:
+      return false
 
 proc getKey*(): Key =
   ## Reads the next keystroke in a non-blocking manner. If there are no
@@ -811,9 +812,10 @@ proc getKey*(): Key =
   ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
   result = getKeyAsync()
-  if result == Key.None:
-    if hasMouseInput():
-      return Key.Mouse
+  when defined(windows):
+    if result == Key.None:
+      if hasMouseInput():
+        return Key.Mouse
 
 type
   TerminalChar* = object

@@ -14,7 +14,6 @@ var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
 
 while true:
   var key = getKey()
-  tb.write(0,0, $key)
   case key
   of Key.None: discard
   of Key.Escape, Key.Q: exitProc()
