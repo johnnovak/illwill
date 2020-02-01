@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.1.1"
+version       = "0.1.2"
 author        = "John Novak <john@johnnovak.net>"
 description   = "A curses inspired simple cross-platform console library for Nim"
 license       = "WTFPL"
