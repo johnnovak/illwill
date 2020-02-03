@@ -790,11 +790,11 @@ when defined(windows):
       gMouseInfo.button = ButtonNone
 
     if gMouseInfo.button != ButtonNone:
-      gMouseInfo.action = MouseButtonAction.Pressed
+      gMouseInfo.action = MouseButtonAction.ActionPressed
     elif gMouseInfo.button == ButtonNone and gLastMouseInfo.button != ButtonNone:
-      gMouseInfo.action = MouseButtonAction.Released
+      gMouseInfo.action = MouseButtonAction.ActionReleased
     else:
-      gMouseInfo.action = MouseButtonAction.None
+      gMouseInfo.action = MouseButtonAction.ActionNone
 
     if gLastMouseInfo.x != gMouseInfo.x or gLastMouseInfo.y != gMouseInfo.y:
       gMouseInfo.move = true
