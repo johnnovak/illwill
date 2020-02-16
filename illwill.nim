@@ -816,6 +816,7 @@ when defined(windows):
         gMouseInfo.scrollDir = ScrollDirection.sdUp
     else:
       gMouseInfo.scroll = false
+      gMouseInfo.scrollDir = ScrollDirection.sdNone
 
     gMouseInfo.ctrl = bitand(inputRecord.Event.MouseEvent.dwControlKeyState, LEFT_CTRL_PRESSED) == LEFT_CTRL_PRESSED or
         bitand(inputRecord.Event.MouseEvent.dwControlKeyState, RIGHT_CTRL_PRESSED) == RIGHT_CTRL_PRESSED
