@@ -1,6 +1,6 @@
 # illwill
 
-## Overview 
+## Overview
 
 **illwill** is a *(n)curses* inspired simple terminal library that aims to make
 writing cross-platform text mode applications easy. Having said that, it's
@@ -26,7 +26,7 @@ a full-blown GUI.
   reduce CPU usage).
 * Simple graphics using **UTF-8 box drawing** symbols.
 * **Full-screen support** with restoring the contents of the terminal after exit.
-* **Mouse support** with modifier key reporting
+* **Mouse support** with modifier key reporting.
 * **No dependencies**—only depends on the standard terminal module.
 
 <img src="https://github.com/johnnovak/illwill/raw/master/img/nim-mod-1.png" align="left" width="48%" alt="illwill in action" />
