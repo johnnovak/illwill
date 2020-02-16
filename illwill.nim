@@ -407,6 +407,7 @@ when defined(windows):
   proc consoleDeinit() =
     discard setConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), gOldConsoleMode)
 
+
   func getKeyAsync(): Key =
     var key = Key.None
 
@@ -453,6 +454,7 @@ when defined(windows):
       else:
         key = toKey(c)
     result = key
+
 
   proc writeConsole(hConsoleOutput: HANDLE, lpBuffer: pointer,
                     nNumberOfCharsToWrite: DWORD,
@@ -978,6 +980,7 @@ func height*(tb: TerminalBuffer): Natural =
   ## Returns the height of the terminal buffer.
   result = tb.height
 
+
 proc copyFrom*(tb: var TerminalBuffer,
                src: TerminalBuffer, srcX, srcY, width, height: Natural,
                destX, destY: Natural) =
@@ -1001,6 +1004,7 @@ proc copyFrom*(tb: var TerminalBuffer,
   for yOffs in 0..<h:
     for xOffs in 0..<w:
       tb[xOffs + destX, yOffs + destY] = src[xOffs + srcX, yOffs + srcY]
+
 
 proc copyFrom*(tb: var TerminalBuffer, src: TerminalBuffer) =
   ## Copies the full contents of the `src` terminal buffer into this one.
@@ -1187,6 +1191,7 @@ proc displayDiff(tb: TerminalBuffer) =
         bufXPos = x+1
     flushBuf()
 
+
 var gDoubleBufferingEnabled = true
 
 proc setDoubleBuffering*(enabled: bool) =
@@ -1368,6 +1373,7 @@ proc copyFrom*(bb: var BoxBuffer,
     for xOffs in 0..<w:
       bb[xOffs + destX, yOffs + destY] = src[xOffs + srcX, yOffs + srcY]
 
+
 proc copyFrom*(bb: var BoxBuffer, src: BoxBuffer) =
   ## Copies the full contents of the `src` box buffer into this one.
   ##
@@ -1412,6 +1418,7 @@ proc drawHorizLine*(bb: var BoxBuffer, x1, x2, y: Natural,
       if doubleStyle: h = h or H_DBL
       bb[x,y] = h
 
+
 proc drawVertLine*(bb: var BoxBuffer, x, y1, y2: Natural,
                    doubleStyle: bool = false, connect: bool = true) =
   ## Draws a vertical line into the box buffer. Set `doubleStyle` to `true` to
@@ -1440,6 +1447,7 @@ proc drawVertLine*(bb: var BoxBuffer, x, y1, y2: Natural,
       var v = VERT
       if doubleStyle: v = v or V_DBL
       bb[x,y] = v
+
 
 proc drawRect*(bb: var BoxBuffer, x1, y1, x2, y2: Natural,
                doubleStyle: bool = false, connect: bool = true) =
@@ -1474,6 +1482,7 @@ proc drawRect*(bb: var BoxBuffer, x1, y1, x2, y2: Natural,
     if doubleStyle: c = c or V_DBL or H_DBL
     bb[x2,y2] = c
 
+
 proc write*(tb: var TerminalBuffer, bb: var BoxBuffer) =
   ## Writes the contents of the box buffer into this terminal buffer with
   ## the current text attributes.
@@ -1504,6 +1513,7 @@ proc write*(tb: var TerminalBuffer, bb: var BoxBuffer) =
                              fg: tb.currFg, bg: tb.currBg,
                              style: tb.currStyle, forceWrite: forceWrite)
         tb[x,y] = c
+
 
 type
   TerminalCmd* = enum  ## commands that can be expressed as arguments
@@ -1583,6 +1593,7 @@ macro write*(tb: var TerminalBuffer, args: varargs[typed]): untyped =
   else:
     for item in args.items:
       result.add(newCall(bindSym"writeProcessArg", tb, item))
+
 
 proc drawHorizLine*(tb: var TerminalBuffer, x1, x2, y: Natural,
                     doubleStyle: bool = false) =
