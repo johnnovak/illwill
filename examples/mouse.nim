@@ -6,13 +6,15 @@ proc exitProc() {.noconv.} =
   showCursor()
   quit(0)
 
-illwillInit(fullscreen=true, mouse = true)
+illwillInit(fullscreen=true, mouse=true)
 setControlCHook(exitProc)
 hideCursor()
 
 var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
 
 while true:
+  tb.write(0, 0, fgWhite, styleBright, "Draw with left/right/middle click; ctrl will brighten up the draw.")
+  tb.write(0, 1, "Press Q or Ctrl-C to quit")
   var key = getKey()
   case key
   of Key.None: discard
@@ -38,4 +40,4 @@ while true:
     discard
 
   tb.display()
-  sleep(20)
+  sleep(10)
