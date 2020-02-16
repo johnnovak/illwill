@@ -21,19 +21,19 @@ while true:
   of Key.Escape, Key.Q: exitProc()
   of Key.Mouse:
     let mi = getMouse()
-    if mi.action == MouseButtonAction.ActionPressed:
+    if mi.action == MouseButtonAction.mbaPressed:
       case mi.button
-      of ButtonLeft:
+      of mbLeft:
         if mi.ctrl:
           tb.write mi.x, mi.y, fgRed, styleBright, "♥"
         else:
           tb.write mi.x, mi.y, fgRed, styleDim , "♥"
-      of ButtonMiddle:
+      of mbMiddle:
         tb.write mi.x, mi.y, fgBlue, "◉"
-      of ButtonRight:
+      of mbRight:
         tb.write mi.x, mi.y, fgCyan, "#"
       else: discard
-    elif mi.action == MouseButtonAction.ActionReleased:
+    elif mi.action == MouseButtonAction.mbaReleased:
       tb.write mi.x, mi.y, "^"
   else:
     echo key

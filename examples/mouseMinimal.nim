@@ -1,16 +1,18 @@
 import illwill, os
 
-illwillInit(fullscreen = true, mouse = true)
-hideCursor()
+proc exitProc() {.noconv.} =
+  illwillDeinit()
+  showCursor()
+  quit(0)
+
+setControlCHook(exitProc)
+illwillInit(mouse=true)
 
 var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
 
 while true:
   var key = getKey()
   if key == Key.Mouse:
-    let mi = getMouse()
-    if mi.action == MouseButtonAction.ActionPressed:
-      tb.write mi.x, mi.y, fgRed, styleBright, "♥"
-
+    echo getMouse()
   tb.display()
-  sleep(20)
+  sleep(10)
