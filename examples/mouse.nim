@@ -22,16 +22,16 @@ while true:
   of Key.Mouse:
     let mi = getMouse()
     if mi.action == MouseButtonAction.mbaPressed:
+      let style: Style =
+        if mi.ctrl: styleBright
+        else: styleDim
       case mi.button
       of mbLeft:
-        if mi.ctrl:
-          tb.write mi.x, mi.y, fgRed, styleBright, "♥"
-        else:
-          tb.write mi.x, mi.y, fgRed, styleDim , "♥"
+          tb.write mi.x, mi.y, fgRed, style, "♥"
       of mbMiddle:
-        tb.write mi.x, mi.y, fgBlue, "◉"
+        tb.write mi.x, mi.y, fgBlue, style, "◉"
       of mbRight:
-        tb.write mi.x, mi.y, fgCyan, "#"
+        tb.write mi.x, mi.y, fgCyan, style, "#"
       else: discard
     elif mi.action == MouseButtonAction.mbaReleased:
       tb.write mi.x, mi.y, "^"
