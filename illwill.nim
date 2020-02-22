@@ -32,7 +32,7 @@
 ## * `Style <https://nim-lang.org/docs/terminal.html#Style>`_
 ##
 
-import macros, os, terminal, unicode, strformat, bitops
+import macros, os, terminal, unicode, bitops
 
 export terminal.terminalWidth
 export terminal.terminalHeight
@@ -318,8 +318,6 @@ when defined(windows):
   const
     FROM_LEFT_1ST_BUTTON_PRESSED = 0x0001
     FROM_LEFT_2ND_BUTTON_PRESSED = 0x0004
-    FROM_LEFT_3RD_BUTTON_PRESSED = 0x0008
-    FROM_LEFT_4TH_BUTTON_PRESSED = 0x0010
     RIGHTMOST_BUTTON_PRESSED = 0x0002
 
   const
@@ -473,7 +471,7 @@ when defined(windows):
 
 else:  # OS X & Linux
   import posix, tables, termios
-  import strutils
+  import strutils, strformat
 
   proc consoleInit()
   proc consoleDeinit()
@@ -824,6 +822,7 @@ when defined(windows):
     gMouseInfo.shift = bitand(inputRecord.Event.MouseEvent.dwControlKeyState, SHIFT_PRESSED) == SHIFT_PRESSED
 
     gLastMouseInfo = gMouseInfo
+
 
   proc hasMouseInput(): bool =
     var buffer: array[INPUT_BUFFER_LEN, INPUT_RECORD]
