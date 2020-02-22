@@ -1,5 +1,4 @@
-import os, strutils
-import illwill
+import os, illwill
 
 proc exitProc() {.noconv.} =
   illwillDeinit()
