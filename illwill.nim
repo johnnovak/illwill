@@ -337,11 +337,11 @@ when defined(windows):
 
   # The windows console input structures.
   type
-    KEY_EVENT_RECORD_UNION* {.bycopy.} = object {.union.}
+    KEY_EVENT_RECORD_UNION* {.bycopy, union.} = object
       UnicodeChar*: WCHAR
       AsciiChar*: CHAR
 
-    INPUT_RECORD_UNION* {.bycopy.} = object {.union.}
+    INPUT_RECORD_UNION* {.bycopy, union.} = object
       KeyEvent*: KEY_EVENT_RECORD
       MouseEvent*: MOUSE_EVENT_RECORD
       WindowBufferSizeEvent*: WINDOW_BUFFER_SIZE_RECORD
