@@ -13,7 +13,7 @@ hideCursor()
 var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
 
 while true:
-  tb.write(0, 0, fgWhite, styleBright, "Draw with left/right/middle click; ctrl will brighten up the draw.")
+  tb.write(0, 0, fgWhite, styleBright, "Draw with left/right/middle click; hold Ctrl for brigher colours")
   tb.write(0, 1, "Press Q or Ctrl-C to quit")
   var key = getKey()
   case key
