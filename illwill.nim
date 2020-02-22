@@ -250,7 +250,6 @@ type
   ScrollDirection* {.pure.} = enum
     sdNone, sdUp, sdDown
 
-var gLastMouseInfo = MouseInfo()
 var gMouseInfo = MouseInfo()
 var gMouse: bool = false
 
@@ -780,6 +779,8 @@ proc illwillDeinit*() =
   showCursor()
 
 when defined(windows):
+  var gLastMouseInfo = MouseInfo()
+
   proc fillGlobalMouseInfo(inputRecord: INPUT_RECORD) =
     gMouseInfo.x = inputRecord.Event.MouseEvent.dwMousePosition.X
     gMouseInfo.y = inputRecord.Event.MouseEvent.dwMousePosition.Y
