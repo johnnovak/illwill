@@ -1,5 +1,8 @@
 # Simple example that prints out the size of the terminal window and
 # demonstrates the basic structure of a full-screen app.
+#
+# This example specifically does not work with Javascript since
+# the windows size is determined by the calling parameter in the HTML.
 
 import os, strformat
 import illwill

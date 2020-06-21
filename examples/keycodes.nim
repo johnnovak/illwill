@@ -54,7 +54,7 @@ proc main() =
   setControlCHook(exitProc)
   hideCursor()
 
-  while true:
+  timerLoop(50):
     var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
 
     var key = getKey()
@@ -65,8 +65,6 @@ proc main() =
 
     tb.updateScreen()
     tb.display()
-
-    sleep(50)
 
 main()
 

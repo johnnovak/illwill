@@ -70,7 +70,7 @@ proc main() =
   setControlCHook(exitProc)
   hideCursor()
 
-  while true:
+  timerLoop(20):
     var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
 
     if tb.width > gBoxBuffer.width or tb.height > gBoxBuffer.height:
@@ -107,8 +107,6 @@ proc main() =
 
     tb.updateScreen()
     tb.display()
-
-    sleep(20)
 
 main()
 

@@ -14,7 +14,7 @@ proc main() =
   setControlCHook(exitProc)
   hideCursor()
 
-  while true:
+  timerLoop(20):
     var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
 
     var key = getKey()
@@ -102,8 +102,6 @@ proc main() =
              "Check the source code for the description of the test cases ")
 
     tb.display()
-
-    sleep(20)
 
 main()
 

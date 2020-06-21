@@ -7,9 +7,12 @@
 # input only, so it's best to import only the functions needed for that, as
 # shown below. This way there will be no symbol name clashes when importing
 # the terminal module (e.g. the foreground and background color enums).
+#
+# This example will not work in javascript as it is dependent on the 'terminal'
+# library.
 
 import os, terminal
-from illwill import illwillInit, illwillDeinit, getKey, Key
+from illwill import illwillInit, illwillDeinit, getKey, Key, timerLoop
 
 proc exitProc() {.noconv.} =
   illwillDeinit()
@@ -39,11 +42,9 @@ proc main() =
 
   resetAttributes()
 
-  while true:
+  timerLoop(20):
     var key = getKey()
     if key != Key.None:
       echo key
-    else:
-      sleep(20)
 
 main()
