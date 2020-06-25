@@ -68,12 +68,12 @@ elif defined(posix):
 elif defined(js):
   import js_support
   import system
+  export definitions.Style
   export js_support.terminalWidth
   export js_support.terminalHeight
   export js_support.terminalSize
   export js_support.hideCursor
   export js_support.showCursor
-  export js_support.Style
   export js_support.eraseScreen
   export js_support.setControlCHook
   export js_support.unsetControlCHook
@@ -728,20 +728,6 @@ proc getKey*(): Key =
         return Key.Mouse
 
 type
-  TerminalChar* = object
-    ## Represents a character in the terminal buffer, including color and
-    ## style information.
-    ##
-    ## If `forceWrite` is set to `true`, the character is always output even
-    ## when double buffering is enabled (this is a hack to achieve better
-    ## continuity of horizontal lines when using UTF-8 box drawing symbols in
-    ## the Windows Console).
-    ch*: Rune
-    fg*: ForegroundColor
-    bg*: BackgroundColor
-    style*: set[Style]
-    forceWrite*: bool
-
   TerminalBuffer* = ref object
     ## A virtual terminal buffer of a fixed width and height. It remembers the
     ## current color and style settings and the current cursor position.
@@ -978,10 +964,7 @@ var
   gCurrFg: ForegroundColor
   gCurrStyle: set[Style]
 
-when defined(js):
-  proc setAttribs(c: TerminalChar) =
-    discard
-else:
+when not defined(js):
   proc setAttribs(c: TerminalChar) =
     if c.bg == bgNone or c.fg == fgNone or c.style == {}:
       resetAttributes()
@@ -1005,6 +988,7 @@ else:
         gCurrStyle = c.style
         setStyle(gCurrStyle)
 
+when not defined(js):
   proc setPos(x, y: Natural) =
     terminal.setCursorPos(x, y)
 

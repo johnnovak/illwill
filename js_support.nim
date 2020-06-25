@@ -1,21 +1,36 @@
 import
   unicode,
-  dom
+  dom,
+  tables
+
 export dom except Style
 
 import
   definitions
 
-type Style* = enum
-  styleBright = 1,            ## bright text
-  styleDim,                   ## dim text
-  styleItalic,                ## italic (or reverse on terminals not supporting)
-  styleUnderscore,            ## underscored text
-  styleBlink,                 ## blinking/bold text
-  styleBlinkRapid,            ## rapid blinking/bold text (not widely supported)
-  styleReverse,               ## reverse
-  styleHidden,                ## hidden text
-  styleStrikethrough          ## strikethrough
+let
+  fgColorMap = {
+      $fgNone: "white",
+      $fgBlack: "black",
+      $fgRed: "red",
+      $fgGreen: "green",
+      $fgYellow: "yellow",
+      $fgBlue: "blue",
+      $fgMagenta: "magenta",
+      $fgCyan: "cyan",
+      $fgWhite: "white"
+    }.toTable
+  bgColorMap = {
+      $bgNone: "black",
+      $bgBlack: "black",
+      $bgRed: "red",
+      $bgGreen: "green",
+      $bgYellow: "yellow",
+      $bgBlue: "blue",
+      $bgMagenta: "magenta",
+      $bgCyan: "cyan",
+      $bgWhite: "white"
+    }.toTable
 
 var
   stdout*: dom.File  # this has no real meaning in the JS context, but needed for compatibility
@@ -28,8 +43,14 @@ var
   preTagColumnSize: int = 80
   cursorRow: int = 0
   cursorColumn: int = 0
+  cursorFgColor: ForegroundColor = fgNone
+  cursorBgColor: BackgroundColor = bgNone
+
   screenRows: array[901, seq[Rune]]
   previousScreenRows: array[901, seq[Rune]]
+
+  screenFgColors: array[901, seq[ForegroundColor]]
+  screenBgColors: array[901, seq[BackgroundColor]]
 
 var lastKey*: cstring = ""
 var globalTimer*: ref Interval
@@ -47,8 +68,12 @@ proc setRowSize(newSize: int) =
 proc resetScreenRows() =
   for row in 0 .. preTagRowSize:  # this includes one row past the end
     screenRows[row] = @[]
+    screenFgColors[row] = @[]
+    screenBgColors[row] = @[]
     for col in 0 ..< preTagColumnSize:
       screenRows[row].add " ".runeAt(0)
+      screenFgColors[row].add fgNone
+      screenBgColors[row].add bgNone
 
 resetScreenRows()  # needed during startup
 
@@ -58,17 +83,39 @@ proc detectDiff(): bool =
   for row in 0 ..< preTagRowSize:
     if $screenRows[row] != $previousScreenRows[row]:
       result = true
-      # echo "row:    " & $row
-      # echo "before: " & $previousScreenRows[row]
-      # echo "after:  " & $screenRows[row]
       previousScreenRows[row] = screenRows[row]
+
+
+proc genStartSpan(fg: ForegroundColor, bg: BackgroundColor): string =
+  result = "<span style=\"color: "
+  result &= fgColorMap[$fg]
+  result &= "; background-color: "
+  result &= bgColorMap[$bg]
+  result &= ";\">"
+
+
+proc genRowHtml(rowIndex: int): string =
+  var fg = fgNone
+  var bg = bgNone
+  result = genStartSpan(fg, bg)
+  for col in 0 ..< screenRows[rowIndex].len:
+    let newr = screenRows[rowIndex][col]
+    let newf = screenFgColors[rowIndex][col]
+    let newb = screenBgColors[rowIndex][col]
+    if (newf != fg) or (newb != bg):
+      result &= "</span>"
+      result &= genStartSpan(newf, newb)
+      fg = newf
+      bg = newb
+    result &= $newr
+  result &= "</span>"
 
 
 proc splashIntoPreTag() =
   if detectDiff():
     var newHtml = ""
     for row in 0 ..< preTagRowSize:
-      newHtml &= $screenRows[row]
+      newHtml &= row.genRowHtml
       if row < (preTagRowSize - 1):
         newHtml &= "\n"
     if preTag.isNil:
@@ -145,6 +192,8 @@ proc handleWrap() =
 
 proc putChar(ch: Rune) = 
   screenRows[cursorRow][cursorColumn] = ch
+  screenFgColors[cursorRow][cursorColumn] = cursorFgColor
+  screenBgColors[cursorRow][cursorColumn] = cursorBgColor
   cursorColumn += 1
   handleWrap()
 
@@ -155,8 +204,14 @@ proc put*(s: string) =
   splashIntoPreTag()
 
 
+proc setAttribs*(c: TerminalChar) =
+  cursorFgColor = c.fg
+  cursorBgColor = c.bg
+
+
 proc resetAttributes*() =
-  discard
+  cursorFgColor = fgNone
+  cursorBgColor = bgNone
 
 
 proc showCursor*() =

@@ -1,3 +1,20 @@
+import unicode
+
+when defined(js):
+  type
+    Style* = enum
+      styleBright = 1,              ## bright text
+      styleDim,                   ## dim text
+      styleItalic,                ## italic (or reverse on terminals not supporting)
+      styleUnderscore,            ## underscored text
+      styleBlink,                 ## blinking/bold text
+      styleBlinkRapid,            ## rapid blinking/bold text (not widely supported)
+      styleReverse,               ## reverse
+      styleHidden,                ## hidden text
+      styleStrikethrough          ## strikethrough
+else:
+  import terminal
+
 type
   ForegroundColor* = enum   ## Foreground colors
     fgNone = 0,             ## default
@@ -206,3 +223,16 @@ type
     mbNone, mbLeft, mbMiddle, mbRight
   ScrollDirection* {.pure.} = enum
     sdNone, sdUp, sdDown
+  TerminalChar* = object
+    ## Represents a character in the terminal buffer, including color and
+    ## style information.
+    ##
+    ## If `forceWrite` is set to `true`, the character is always output even
+    ## when double buffering is enabled (this is a hack to achieve better
+    ## continuity of horizontal lines when using UTF-8 box drawing symbols in
+    ## the Windows Console).
+    ch*: Rune
+    fg*: ForegroundColor
+    bg*: BackgroundColor
+    style*: set[Style]
+    forceWrite*: bool
