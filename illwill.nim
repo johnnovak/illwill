@@ -32,226 +32,30 @@
 ## * `Style <https://nim-lang.org/docs/terminal.html#Style>`_
 ##
 
-import macros, os, terminal, unicode, bitops
+import macros, unicode
 
-export terminal.terminalWidth
-export terminal.terminalHeight
-export terminal.terminalSize
-export terminal.hideCursor
-export terminal.showCursor
-export terminal.Style
+when defined(windows):
+  import windows_terminal
+elif defined(posix):
+  import posix_terminal
+elif defined(js):
+  import js_terminal
 
-type
-  ForegroundColor* = enum   ## Foreground colors
-    fgNone = 0,             ## default
-    fgBlack = 30,           ## black
-    fgRed,                  ## red
-    fgGreen,                ## green
-    fgYellow,               ## yellow
-    fgBlue,                 ## blue
-    fgMagenta,              ## magenta
-    fgCyan,                 ## cyan
-    fgWhite                 ## white
+export terminalWidth
+export terminalHeight
+export terminalSize
+export hideCursor
+export showCursor
+export timerLoop
+export setControlCHook
 
-  BackgroundColor* = enum   ## Background colors
-    bgNone = 0,             ## default (transparent)
-    bgBlack = 40,           ## black
-    bgRed,                  ## red
-    bgGreen,                ## green
-    bgYellow,               ## yellow
-    bgBlue,                 ## blue
-    bgMagenta,              ## magenta
-    bgCyan,                 ## cyan
-    bgWhite                 ## white
+import common
 
-  Key* {.pure.} = enum      ## Supported single key presses and key combinations
-    None = (-1, "None"),
-
-    # Special ASCII characters
-    CtrlA  = (1, "CtrlA"),
-    CtrlB  = (2, "CtrlB"),
-    CtrlC  = (3, "CtrlC"),
-    CtrlD  = (4, "CtrlD"),
-    CtrlE  = (5, "CtrlE"),
-    CtrlF  = (6, "CtrlF"),
-    CtrlG  = (7, "CtrlG"),
-    CtrlH  = (8, "CtrlH"),
-    Tab    = (9, "Tab"),     # Ctrl-I
-    CtrlJ  = (10, "CtrlJ"),
-    CtrlK  = (11, "CtrlK"),
-    CtrlL  = (12, "CtrlL"),
-    Enter  = (13, "Enter"),  # Ctrl-M
-    CtrlN  = (14, "CtrlN"),
-    CtrlO  = (15, "CtrlO"),
-    CtrlP  = (16, "CtrlP"),
-    CtrlQ  = (17, "CtrlQ"),
-    CtrlR  = (18, "CtrlR"),
-    CtrlS  = (19, "CtrlS"),
-    CtrlT  = (20, "CtrlT"),
-    CtrlU  = (21, "CtrlU"),
-    CtrlV  = (22, "CtrlV"),
-    CtrlW  = (23, "CtrlW"),
-    CtrlX  = (24, "CtrlX"),
-    CtrlY  = (25, "CtrlY"),
-    CtrlZ  = (26, "CtrlZ"),
-    Escape = (27, "Escape"),
-
-    CtrlBackslash    = (28, "CtrlBackslash"),
-    CtrlRightBracket = (29, "CtrlRightBracket"),
-
-    # Printable ASCII characters
-    Space           = (32, "Space"),
-    ExclamationMark = (33, "ExclamationMark"),
-    DoubleQuote     = (34, "DoubleQuote"),
-    Hash            = (35, "Hash"),
-    Dollar          = (36, "Dollar"),
-    Percent         = (37, "Percent"),
-    Ampersand       = (38, "Ampersand"),
-    SingleQuote     = (39, "SingleQuote"),
-    LeftParen       = (40, "LeftParen"),
-    RightParen      = (41, "RightParen"),
-    Asterisk        = (42, "Asterisk"),
-    Plus            = (43, "Plus"),
-    Comma           = (44, "Comma"),
-    Minus           = (45, "Minus"),
-    Dot             = (46, "Dot"),
-    Slash           = (47, "Slash"),
-
-    Zero  = (48, "Zero"),
-    One   = (49, "One"),
-    Two   = (50, "Two"),
-    Three = (51, "Three"),
-    Four  = (52, "Four"),
-    Five  = (53, "Five"),
-    Six   = (54, "Six"),
-    Seven = (55, "Seven"),
-    Eight = (56, "Eight"),
-    Nine  = (57, "Nine"),
-
-    Colon        = (58, "Colon"),
-    Semicolon    = (59, "Semicolon"),
-    LessThan     = (60, "LessThan"),
-    Equals       = (61, "Equals"),
-    GreaterThan  = (62, "GreaterThan"),
-    QuestionMark = (63, "QuestionMark"),
-    At           = (64, "At"),
-
-    ShiftA  = (65, "ShiftA"),
-    ShiftB  = (66, "ShiftB"),
-    ShiftC  = (67, "ShiftC"),
-    ShiftD  = (68, "ShiftD"),
-    ShiftE  = (69, "ShiftE"),
-    ShiftF  = (70, "ShiftF"),
-    ShiftG  = (71, "ShiftG"),
-    ShiftH  = (72, "ShiftH"),
-    ShiftI  = (73, "ShiftI"),
-    ShiftJ  = (74, "ShiftJ"),
-    ShiftK  = (75, "ShiftK"),
-    ShiftL  = (76, "ShiftL"),
-    ShiftM  = (77, "ShiftM"),
-    ShiftN  = (78, "ShiftN"),
-    ShiftO  = (79, "ShiftO"),
-    ShiftP  = (80, "ShiftP"),
-    ShiftQ  = (81, "ShiftQ"),
-    ShiftR  = (82, "ShiftR"),
-    ShiftS  = (83, "ShiftS"),
-    ShiftT  = (84, "ShiftT"),
-    ShiftU  = (85, "ShiftU"),
-    ShiftV  = (86, "ShiftV"),
-    ShiftW  = (87, "ShiftW"),
-    ShiftX  = (88, "ShiftX"),
-    ShiftY  = (89, "ShiftY"),
-    ShiftZ  = (90, "ShiftZ"),
-
-    LeftBracket  = (91, "LeftBracket"),
-    Backslash    = (92, "Backslash"),
-    RightBracket = (93, "RightBracket"),
-    Caret        = (94, "Caret"),
-    Underscore   = (95, "Underscore"),
-    GraveAccent  = (96, "GraveAccent"),
-
-    A = (97, "A"),
-    B = (98, "B"),
-    C = (99, "C"),
-    D = (100, "D"),
-    E = (101, "E"),
-    F = (102, "F"),
-    G = (103, "G"),
-    H = (104, "H"),
-    I = (105, "I"),
-    J = (106, "J"),
-    K = (107, "K"),
-    L = (108, "L"),
-    M = (109, "M"),
-    N = (110, "N"),
-    O = (111, "O"),
-    P = (112, "P"),
-    Q = (113, "Q"),
-    R = (114, "R"),
-    S = (115, "S"),
-    T = (116, "T"),
-    U = (117, "U"),
-    V = (118, "V"),
-    W = (119, "W"),
-    X = (120, "X"),
-    Y = (121, "Y"),
-    Z = (122, "Z"),
-
-    LeftBrace  = (123, "LeftBrace"),
-    Pipe       = (124, "Pipe"),
-    RightBrace = (125, "RightBrace"),
-    Tilde      = (126, "Tilde"),
-    Backspace  = (127, "Backspace"),
-
-    # Special characters with virtual keycodes
-    Up       = (1001, "Up"),
-    Down     = (1002, "Down"),
-    Right    = (1003, "Right"),
-    Left     = (1004, "Left"),
-    Home     = (1005, "Home"),
-    Insert   = (1006, "Insert"),
-    Delete   = (1007, "Delete"),
-    End      = (1008, "End"),
-    PageUp   = (1009, "PageUp"),
-    PageDown = (1010, "PageDown"),
-
-    F1  = (1011, "F1"),
-    F2  = (1012, "F2"),
-    F3  = (1013, "F3"),
-    F4  = (1014, "F4"),
-    F5  = (1015, "F5"),
-    F6  = (1016, "F6"),
-    F7  = (1017, "F7"),
-    F8  = (1018, "F8"),
-    F9  = (1019, "F9"),
-    F10 = (1020, "F10"),
-    F11 = (1021, "F11"),
-    F12 = (1022, "F12"),
-
-    Mouse = (5000, "Mouse")
-
-  IllwillError* = object of Exception
-
-type
-  MouseButtonAction* {.pure.} = enum
-    mbaNone, mbaPressed, mbaReleased
-  MouseInfo* = object
-    x*: int ## x mouse position
-    y*: int ## y mouse position
-    button*: MouseButton ## which button was pressed
-    action*: MouseButtonAction ## if button was released or pressed
-    ctrl*: bool ## was ctrl was down on event
-    shift*: bool ## was shift was down on event
-    scroll*: bool ## if this is a mouse scroll
-    scrollDir*: ScrollDirection
-    move*: bool ## if this a mouse move
-  MouseButton* {.pure.} = enum
-    mbNone, mbLeft, mbMiddle, mbRight
-  ScrollDirection* {.pure.} = enum
-    sdNone, sdUp, sdDown
-
-var gMouseInfo = MouseInfo()
-var gMouse: bool = false
+export ForegroundColor
+export BackgroundColor
+export Style
+export Key
+export IllwillError
 
 proc getMouse*(): MouseInfo =
   ## When `illwillInit(mouse=true)` all mouse movements and clicks are captured.
@@ -282,15 +86,6 @@ proc getMouse*(): MouseInfo =
 
   return gMouseInfo
 
-func toKey(c: int): Key =
-  try:
-    result = Key(c)
-  except RangeError:  # ignore unknown keycodes
-    result = Key.None
-
-var gIllwillInitialised = false
-var gFullScreen = false
-var gFullRedrawNextFrame = false
 
 when defined(windows):
   import encodings, unicode, winlean
@@ -468,219 +263,6 @@ when defined(windows):
     discard writeConsole(hStdout, pointer(us[0].addr), DWORD(s.runeLen),
                          numWritten.addr, nil)
 
-else:  # OS X & Linux
-  import posix, tables, termios
-  import strutils, strformat
-
-  proc consoleInit()
-  proc consoleDeinit()
-
-  # Mouse
-  # https://de.wikipedia.org/wiki/ANSI-Escapesequenz
-  # https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Extended-coordinates
-  const
-    CSI = 0x1B.chr & 0x5B.chr
-    SET_BTN_EVENT_MOUSE = "1002"
-    SET_ANY_EVENT_MOUSE = "1003"
-    SET_SGR_EXT_MODE_MOUSE = "1006"
-    # SET_URXVT_EXT_MODE_MOUSE = "1015"
-    ENABLE = "h"
-    DISABLE = "l"
-    MouseTrackAny = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{ENABLE}{CSI}?{SET_ANY_EVENT_MOUSE}{ENABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{ENABLE}"
-    DisableMouseTrackAny = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{DISABLE}{CSI}?{SET_ANY_EVENT_MOUSE}{DISABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{DISABLE}"
-
-  # Adapted from:
-  # https://ftp.gnu.org/old-gnu/Manuals/glibc-2.2.3/html_chapter/libc_24.html#SEC499
-  proc SIGTSTP_handler(sig: cint) {.noconv.} =
-    signal(SIGTSTP, SIG_DFL)
-    # XXX why don't the below 3 lines seem to have any effect?
-    resetAttributes()
-    showCursor()
-    consoleDeinit()
-    discard posix.raise(SIGTSTP)
-
-  proc SIGCONT_handler(sig: cint) {.noconv.} =
-    signal(SIGCONT, SIGCONT_handler)
-    signal(SIGTSTP, SIGTSTP_handler)
-
-    gFullRedrawNextFrame = true
-    consoleInit()
-    hideCursor()
-
-  proc installSignalHandlers() =
-    signal(SIGCONT, SIGCONT_handler)
-    signal(SIGTSTP, SIGTSTP_handler)
-
-  proc nonblock(enabled: bool) =
-    var ttyState: Termios
-
-    # get the terminal state
-    discard tcGetAttr(STDIN_FILENO, ttyState.addr)
-
-    if enabled:
-      # turn off canonical mode & echo
-      ttyState.c_lflag = ttyState.c_lflag and not Cflag(ICANON or ECHO)
-
-      # minimum of number input read
-      ttyState.c_cc[VMIN] = 0.cuchar
-
-    else:
-      # turn on canonical mode & echo
-      ttyState.c_lflag = ttyState.c_lflag or ICANON or ECHO
-
-    # set the terminal attributes.
-    discard tcSetAttr(STDIN_FILENO, TCSANOW, ttyState.addr)
-
-  proc kbhit(): cint =
-    var tv: Timeval
-    tv.tv_sec = Time(0)
-    tv.tv_usec = 0
-
-    var fds: TFdSet
-    FD_ZERO(fds)
-    FD_SET(STDIN_FILENO, fds)
-    discard select(STDIN_FILENO+1, fds.addr, nil, nil, tv.addr)
-    return FD_ISSET(STDIN_FILENO, fds)
-
-  proc consoleInit() =
-    nonblock(true)
-    installSignalHandlers()
-
-  proc consoleDeinit() =
-    nonblock(false)
-
-  # surely a 100 char buffer is more than enough; the longest
-  # keycode sequence I've seen was 6 chars
-  const KeySequenceMaxLen = 100
-
-  # global keycode buffer
-  var keyBuf: array[KeySequenceMaxLen, int]
-
-  let
-    keySequences = {
-      ord(Key.Up):        @["\eOA", "\e[A"],
-      ord(Key.Down):      @["\eOB", "\e[B"],
-      ord(Key.Right):     @["\eOC", "\e[C"],
-      ord(Key.Left):      @["\eOD", "\e[D"],
-
-      ord(Key.Home):      @["\e[1~", "\e[7~", "\eOH", "\e[H"],
-      ord(Key.Insert):    @["\e[2~"],
-      ord(Key.Delete):    @["\e[3~"],
-      ord(Key.End):       @["\e[4~", "\e[8~", "\eOF", "\e[F"],
-      ord(Key.PageUp):    @["\e[5~"],
-      ord(Key.PageDown):  @["\e[6~"],
-
-      ord(Key.F1):        @["\e[11~", "\eOP"],
-      ord(Key.F2):        @["\e[12~", "\eOQ"],
-      ord(Key.F3):        @["\e[13~", "\eOR"],
-      ord(Key.F4):        @["\e[14~", "\eOS"],
-      ord(Key.F5):        @["\e[15~"],
-      ord(Key.F6):        @["\e[17~"],
-      ord(Key.F7):        @["\e[18~"],
-      ord(Key.F8):        @["\e[19~"],
-      ord(Key.F9):        @["\e[20~"],
-      ord(Key.F10):       @["\e[21~"],
-      ord(Key.F11):       @["\e[23~"],
-      ord(Key.F12):       @["\e[24~"],
-    }.toTable
-
-  proc splitInputs(inp: openarray[int], max: Natural): seq[seq[int]] =
-    ## splits the input buffer to extract mouse coordinates
-    var parts: seq[seq[int]] = @[]
-    var cur: seq[int] = @[]
-    for ch in inp[CSI.len+1 .. max-1]:
-      if ch == ord('M'):
-        # Button press
-        parts.add(cur)
-        gMouseInfo.action = mbaPressed
-        break
-      elif ch == ord('m'):
-        # Button release
-        parts.add(cur)
-        gMouseInfo.action = mbaReleased
-        break
-      elif ch != ord(';'):
-        cur.add(ch)
-      else:
-        parts.add(cur)
-        cur = @[]
-    return parts
-
-  proc getPos(inp: seq[int]): int =
-    var str = ""
-    for ch in inp:
-      str &= $(ch.chr)
-    result = parseInt(str)
-
-  proc fillGlobalMouseInfo(keyBuf: array[KeySequenceMaxLen, int]) =
-    let parts = splitInputs(keyBuf, keyBuf.len)
-    gMouseInfo.x = parts[1].getPos() - 1
-    gMouseInfo.y = parts[2].getPos() - 1
-    let bitset = parts[0].getPos()
-    gMouseInfo.ctrl = bitset.testBit(4)
-    gMouseInfo.shift = bitset.testBit(2)
-    gMouseInfo.move = bitset.testBit(5)
-    case ((bitset.uint8 shl 6) shr 6).int
-    of 0: gMouseInfo.button = MouseButton.mbLeft
-    of 1: gMouseInfo.button = MouseButton.mbMiddle
-    of 2: gMouseInfo.button = MouseButton.mbRight
-    else:
-      gMouseInfo.action = MouseButtonAction.mbaNone
-      gMouseInfo.button = MouseButton.mbNone # Move sends 3, but we ignore
-    gMouseInfo.scroll = bitset.testBit(6)
-    if gMouseInfo.scroll:
-      # on scroll button=3 is reported, but we want no button pressed
-      gMouseInfo.button = MouseButton.mbNone
-      if bitset.testBit(0): gMouseInfo.scrollDir = ScrollDirection.sdDown
-      else: gMouseInfo.scrollDir = ScrollDirection.sdUp
-    else:
-      gMouseInfo.scrollDir = ScrollDirection.sdNone
-
-  proc parseKey(charsRead: int): Key =
-    # Inspired by
-    # https://github.com/mcandre/charm/blob/master/lib/charm.c
-    var key = Key.None
-    if charsRead == 1:
-      let ch = keyBuf[0]
-      case ch:
-      of   9: key = Key.Tab
-      of  10: key = Key.Enter
-      of  27: key = Key.Escape
-      of  32: key = Key.Space
-      of 127: key = Key.Backspace
-      of 0, 29, 30, 31: discard   # these have no Windows equivalents so
-                                  # we'll ignore them
-      else:
-        key = toKey(ch)
-
-    elif charsRead > 3 and keyBuf[0] == 27 and keyBuf[1] == 91 and keyBuf[2] == 60: # TODO what are these :)
-      fillGlobalMouseInfo(keyBuf)
-      return Key.Mouse
-
-    else:
-      var inputSeq = ""
-      for i in 0..<charsRead:
-        inputSeq &= char(keyBuf[i])
-      for keyCode, sequences in keySequences.pairs:
-        for s in sequences:
-          if s == inputSeq:
-            key = toKey(keyCode)
-    result = key
-
-  proc getKeyAsync(): Key =
-    var i = 0
-    while kbhit() > 0 and i < KeySequenceMaxLen:
-      var ret = read(0, keyBuf[i].addr, 1)
-      if ret > 0:
-        i += 1
-      else:
-        break
-    if i == 0:  # nothing read
-      result = Key.None
-    else:
-      result = parseKey(i)
-
-  template put(s: string) = stdout.write s
 
 when defined(posix):
   const
@@ -714,15 +296,7 @@ proc exitFullScreen() =
     eraseScreen()
     setCursorPos(0, 0)
 
-when defined(posix):
-  proc enableMouse() =
-    stdout.write(MouseTrackAny)
-    stdout.flushFile()
-
-  proc disableMouse() =
-    stdout.write(DisableMouseTrackAny)
-    stdout.flushFile()
-else:
+when defined(windows):
   proc enableMouse(hConsoleInput: Handle) =
     var currentMode: DWORD
     discard getConsoleMode(hConsoleInput, currentMode.addr)
@@ -750,10 +324,12 @@ proc illwillInit*(fullScreen: bool = true, mouse: bool = false) =
   consoleInit()
   gMouse = mouse
   if gMouse:
-    when defined(posix):
-      enableMouse()
-    else:
+    when defined(windows):
       enableMouse(getStdHandle(STD_INPUT_HANDLE))
+    elif defined(posix):
+      enableMouse()
+    elif defined(js):
+      discard
   gIllwillInitialised = true
   resetAttributes()
 
@@ -769,10 +345,12 @@ proc illwillDeinit*() =
   checkInit()
   if gFullScreen: exitFullScreen()
   if gMouse:
-    when defined(posix):
-      disableMouse()
-    else:
+    when defined(windows):
       disableMouse(getStdHandle(STD_INPUT_HANDLE), gOldConsoleModeInput)
+    elif defined(posix):
+      disableMouse()
+    elif defined(js):
+      discard
   consoleDeinit()
   gIllwillInitialised = false
   resetAttributes()
@@ -857,69 +435,6 @@ proc getKey*(): Key =
       if hasMouseInput():
         return Key.Mouse
 
-type
-  TerminalChar* = object
-    ## Represents a character in the terminal buffer, including color and
-    ## style information.
-    ##
-    ## If `forceWrite` is set to `true`, the character is always output even
-    ## when double buffering is enabled (this is a hack to achieve better
-    ## continuity of horizontal lines when using UTF-8 box drawing symbols in
-    ## the Windows Console).
-    ch*: Rune
-    fg*: ForegroundColor
-    bg*: BackgroundColor
-    style*: set[Style]
-    forceWrite*: bool
-
-  TerminalBuffer* = ref object
-    ## A virtual terminal buffer of a fixed width and height. It remembers the
-    ## current color and style settings and the current cursor position.
-    ##
-    ## Write to the terminal buffer with `TerminalBuffer.write()` or access
-    ## the character buffer directly with the index operators.
-    ##
-    ## Example:
-    ##
-    ## .. code-block::
-    ##   import illwill, unicode
-    ##
-    ##   # Initialise the console in non-fullscreen mode
-    ##   illwillInit(fullscreen=false)
-    ##
-    ##   # Create a new terminal buffer
-    ##   var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
-    ##
-    ##   # Write the character "X" at position (5,5) then read it back
-    ##   tb[5,5] = TerminalChar(ch: "X".runeAt(0), fg: fgYellow, bg: bgNone, style: {})
-    ##   let ch = tb[5,5]
-    ##
-    ##   # Write "foo" at position (10,10) in bright red
-    ##   tb.setForegroundColor(fgRed, bright=true)
-    ##   tb.setCursorPos(10, 10)
-    ##   tb.write("foo")
-    ##
-    ##   # Write "bar" at position (15,12) in bright red, without changing
-    ##   # the current cursor position
-    ##   tb.write(15, 12, "bar")
-    ##
-    ##   tb.write(0, 20, "Normal ", fgYellow, "ESC", fgWhite,
-    ##                   " or ", fgYellow, "Q", fgWhite, " to quit")
-    ##
-    ##   # Output the contents of the buffer to the terminal
-    ##   tb.display()
-    ##
-    ##   # Clean up
-    ##   illwillDeinit()
-    ##
-    width: int
-    height: int
-    buf: seq[TerminalChar]
-    currBg: BackgroundColor
-    currFg: ForegroundColor
-    currStyle: set[Style]
-    currX: Natural
-    currY: Natural
 
 proc `[]=`*(tb: var TerminalBuffer, x, y: Natural, ch: TerminalChar) =
   ## Index operator to write a character into the terminal buffer at the
@@ -1115,27 +630,27 @@ proc setAttribs(c: TerminalChar) =
     gCurrFg = c.fg
     gCurrStyle = c.style
     if gCurrBg != bgNone:
-      setBackgroundColor(cast[terminal.BackgroundColor](gCurrBg))
+      envSetBackgroundColor(gCurrBg.ord)
     if gCurrFg != fgNone:
-      setForegroundColor(cast[terminal.ForegroundColor](gCurrFg))
+      envSetForegroundColor(gCurrFg.ord)
     if gCurrStyle != {}:
-      setStyle(gCurrStyle)
+      envSetStyle(gCurrStyle)
   else:
     if c.bg != gCurrBg:
       gCurrBg = c.bg
-      setBackgroundColor(cast[terminal.BackgroundColor](gCurrBg))
+      envSetBackgroundColor(gCurrBg.ord)
     if c.fg != gCurrFg:
       gCurrFg = c.fg
-      setForegroundColor(cast[terminal.ForegroundColor](gCurrFg))
+      envSetForegroundColor(gCurrFg.ord)
     if c.style != gCurrStyle:
       gCurrStyle = c.style
-      setStyle(gCurrStyle)
+      envSetStyle(gCurrStyle)
 
 proc setPos(x, y: Natural) =
-  terminal.setCursorPos(x, y)
+  setCursorPos(x, y)
 
 proc setXPos(x: Natural) =
-  terminal.setCursorXPos(x)
+  setCursorXPos(x)
 
 proc displayFull(tb: TerminalBuffer) =
   var buf = ""
@@ -1224,10 +739,12 @@ proc display*(tb: TerminalBuffer) =
       else:
         displayFull(tb)
         gPrevTerminalBuffer = newTerminalBufferFrom(tb)
-    flushFile(stdout)
+    when not defined(js):
+      flushFile(stdout)
   else:
     displayFull(tb)
-    flushFile(stdout)
+    when not defined(js):
+      flushFile(stdout)
     gFullRedrawNextFrame = false
 
 type BoxChar = int

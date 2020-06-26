@@ -21,7 +21,7 @@ hideCursor()
 var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
 
 # 3. Display some simple static UI that doesn't change from frame to frame.
-tb.setForegroundColor(fgBlack, true)
+tb.setForegroundColor(fgBlue, true)
 tb.drawRect(0, 0, 40, 5)
 tb.drawHorizLine(2, 38, 3, doubleStyle=true)
 
@@ -33,7 +33,7 @@ tb.write(2, 2, "Press ", fgYellow, "ESC", fgWhite,
 # user input (keypress events), do something based on the input, modify the
 # contents of the terminal buffer (if necessary), and then display the new
 # frame.
-while true:
+timerLoop(20):
   var key = getKey()
   case key
   of Key.None: discard
@@ -43,4 +43,3 @@ while true:
     tb.write(2, 4, resetStyle, "Key pressed: ", fgGreen, $key)
 
   tb.display()
-  sleep(20)
