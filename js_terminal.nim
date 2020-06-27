@@ -38,6 +38,13 @@ var
   preTagColumnSize: int = 80
   lastKey: cstring = ""
 
+var
+  cursorX = 0
+  cursorY = 0
+
+var
+  globalTimer*: ref Interval
+
 
 proc setAttribs*(c: TerminalChar) =
   discard
@@ -81,11 +88,12 @@ proc hideCursor*() =
 
 
 proc setCursorPos*(x, y: Natural) =
-  discard
+  cursorX = x
+  cursorY = y
 
 
 proc setCursorXPos*(x: Natural) = 
-  discard
+  cursorX = x
 
 
 proc enableMouse*() =
@@ -94,6 +102,41 @@ proc enableMouse*() =
 
 proc disableMouse*() =
   discard
+
+
+proc genStartSpan(fg: ForegroundColor, bg: BackgroundColor): string =
+  result = "<span style=\"color: "
+  result &= fgColorMap[$fg]
+  result &= "; background-color: "
+  result &= bgColorMap[$bg]
+  result &= ";\">"
+
+
+proc genRowHtml(tb: TerminalBuffer, row: int): string =
+  var fg = tb[0, row].fg
+  var bg = tb[0, row].bg
+  result = genStartSpan(fg, bg)
+  for col in 0 ..< tb.width:
+    let c = tb[col, row]
+    if (c.fg != fg) or (c.bg != bg):
+      result &= "</span>"
+      result &= genStartSpan(c.fg, c.bg)
+      fg = c.fg
+      bg = c.bg
+    result &= $c.ch
+  result &= "</span>"
+
+
+proc applyTbToPre(tb: TerminalBuffer) =
+  if preTag.isNil:
+    echo "not loaded yet"
+    return
+  var newHtml = ""
+  for row in 0 ..< tb.height:
+    newHtml &= tb.genRowHtml(row)
+    if row < (tb.height - 1):
+      newHtml &= "\n"
+  preTag.innerHtml = newHtml.cstring
 
 
 proc eraseScreen*() =
@@ -106,8 +149,8 @@ proc eraseScreen*() =
   #   splashIntoPreTag()
 
 
-proc put*(s: string) = 
-  discard
+proc put*(tb: TerminalBuffer) = 
+  applyTbToPre(tb)
 
 
 proc setControlCHook*(hook: proc () {.noconv.}) =
@@ -161,25 +204,22 @@ proc consoleInit*() =
     onkeydown,
     false
   )
-  # globalTimer = window.setInterval(dummyInterval, 6000)
-  # if not preTag.isNil:
-  #   splashIntoPreTag()
-  #   preTag.disabled = false
+  globalTimer = window.setInterval(dummyInterval, 6000)
+  if not preTag.isNil:
+    preTag.disabled = false
 
 
 proc consoleDeInit*() =
-  # window.clearInterval(globalTimer)
+  window.clearInterval(globalTimer)
   window.removeEventListener(
     "keydown".cstring, 
     onkeydown
   )
-  # if preTag.isNil:
-  #   echo "not loaded yet"
-  #   return
-  # preTag.disabled = true
+  if preTag.isNil:
+    echo "not loaded yet"
+    return
+  preTag.disabled = true
 
-
-var globalTimer*: ref Interval
 
 template timerLoop*(msDelay: int, content: untyped): untyped =
   globalTimer = window.setInterval(

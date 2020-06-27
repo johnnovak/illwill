@@ -290,6 +290,20 @@ var gIllwillInitialised* = false
 var gFullScreen* = false
 var gFullRedrawNextFrame* = false
 
+proc `[]=`*(tb: var TerminalBuffer, x, y: Natural, ch: TerminalChar) =
+  ## Index operator to write a character into the terminal buffer at the
+  ## specified location. Does nothing if the location is outside of the
+  ## extents of the terminal buffer.
+  if x < tb.width and y < tb.height:
+    tb.buf[tb.width * y + x] = ch
+
+proc `[]`*(tb: TerminalBuffer, x, y: Natural): TerminalChar =
+  ## Index operator to read a character from the terminal buffer at the
+  ## specified location. Returns nil if the location is outside of the extents
+  ## of the terminal buffer.
+  if x < tb.width and y < tb.height:
+    result = tb.buf[tb.width * y + x]
+
 func toKey*(c: int): Key =
   try:
     result = Key(c)

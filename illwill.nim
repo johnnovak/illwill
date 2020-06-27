@@ -5,7 +5,8 @@
 ##
 ## * Non-blocking keyboard input
 ## * Support for key combinations and special keys available in the standard
-##   Windows Console (`cmd.exe`) and most common POSIX terminals
+##   Windows Console (`cmd.exe`), most common POSIX terminals, and browsers (when
+##   compiled to JavaScript.)
 ## * Virtual terminal buffers with double-buffering support (only
 ##   display changes from the previous frame and minimise the number of
 ##   attribute changes to reduce CPU usage)
@@ -15,7 +16,7 @@
 ## * Basic suspend/continue (`SIGTSTP`, `SIGCONT`) support on POSIX
 ## * Basic mouse support.
 ##
-## The module depends only on the standard `terminal
+## When compiled for Windows or POSIX (Linux or MacOS), the module depends on the standard `terminal
 ## <https://nim-lang.org/docs/terminal.html>`_ module. However, you
 ## should not use any terminal functions directly, neither should you use
 ## `echo`, `write` or other similar functions for output. You should **only**
@@ -31,6 +32,9 @@
 ## * `showCursor() <https://nim-lang.org/docs/terminal.html#showCursor.t>`_
 ## * `Style <https://nim-lang.org/docs/terminal.html#Style>`_
 ##
+## When compiled for Javascript (JS), the `echo` command is safe to use but it's
+## output is sent to the debug console NOT the psuedo-terminal.
+## 
 
 import macros, unicode
 
@@ -86,184 +90,6 @@ proc getMouse*(): MouseInfo =
 
   return gMouseInfo
 
-
-when defined(windows):
-  import encodings, unicode, winlean
-
-  proc kbhit(): cint {.importc: "_kbhit", header: "<conio.h>".}
-  proc getch(): cint {.importc: "_getch", header: "<conio.h>".}
-
-  proc getConsoleMode(hConsoleHandle: Handle, dwMode: ptr DWORD): WINBOOL {.
-      stdcall, dynlib: "kernel32", importc: "GetConsoleMode".}
-
-  proc setConsoleMode(hConsoleHandle: Handle, dwMode: DWORD): WINBOOL {.
-      stdcall, dynlib: "kernel32", importc: "SetConsoleMode".}
-
-  # Mouse
-  const
-    INPUT_BUFFER_LEN = 512
-  const
-    ENABLE_MOUSE_INPUT = 0x10
-    ENABLE_WINDOW_INPUT = 0x8
-    ENABLE_QUICK_EDIT_MODE = 0x40
-    ENABLE_EXTENDED_FLAGS = 0x80
-    MOUSE_EVENT = 0x0002
-
-  const
-    FROM_LEFT_1ST_BUTTON_PRESSED = 0x0001
-    FROM_LEFT_2ND_BUTTON_PRESSED = 0x0004
-    RIGHTMOST_BUTTON_PRESSED = 0x0002
-
-  const
-    LEFT_CTRL_PRESSED = 0x0008
-    RIGHT_CTRL_PRESSED = 0x0004
-    SHIFT_PRESSED = 0x0010
-
-  const
-    MOUSE_WHEELED = 0x0004
-
-  type
-    WCHAR = WinChar
-    CHAR = char
-    BOOL = WINBOOL
-    WORD = uint16
-    UINT = cint
-    SHORT = int16
-
-  # The windows console input structures.
-  type
-    KEY_EVENT_RECORD_UNION* {.bycopy, union.} = object
-      UnicodeChar*: WCHAR
-      AsciiChar*: CHAR
-
-    INPUT_RECORD_UNION* {.bycopy, union.} = object
-      KeyEvent*: KEY_EVENT_RECORD
-      MouseEvent*: MOUSE_EVENT_RECORD
-      WindowBufferSizeEvent*: WINDOW_BUFFER_SIZE_RECORD
-      MenuEvent*: MENU_EVENT_RECORD
-      FocusEvent*: FOCUS_EVENT_RECORD
-
-    COORD* {.bycopy.} = object
-      X*: SHORT
-      Y*: SHORT
-
-    PCOORD* = ptr COORD
-    FOCUS_EVENT_RECORD* {.bycopy.} = object
-      bSetFocus*: BOOL
-
-    KEY_EVENT_RECORD* {.bycopy.} = object
-      bKeyDown*: BOOL
-      wRepeatCount*: WORD
-      wVirtualKeyCode*: WORD
-      wVirtualScanCode*: WORD
-      uChar*: KEY_EVENT_RECORD_UNION
-      dwControlKeyState*: DWORD
-
-    MENU_EVENT_RECORD* {.bycopy.} = object
-      dwCommandId*: UINT
-
-    PMENU_EVENT_RECORD* = ptr MENU_EVENT_RECORD
-    MOUSE_EVENT_RECORD* {.bycopy.} = object
-      dwMousePosition*: COORD
-      dwButtonState*: DWORD
-      dwControlKeyState*: DWORD
-      dwEventFlags*: DWORD
-
-    WINDOW_BUFFER_SIZE_RECORD* {.bycopy.} = object
-      dwSize*: COORD
-
-    INPUT_RECORD* {.bycopy.} = object
-      EventType*: WORD
-      Event*: INPUT_RECORD_UNION
-
-  type
-    PINPUT_RECORD = ptr array[INPUT_BUFFER_LEN, INPUT_RECORD]
-    LPDWORD = PDWORD
-
-  proc peekConsoleInputA(hConsoleInput: HANDLE, lpBuffer: PINPUT_RECORD, nLength: DWORD, lpNumberOfEventsRead: LPDWORD): WINBOOL
-    {.stdcall, dynlib: "kernel32", importc: "PeekConsoleInputA".}
-
-  const
-    ENABLE_WRAP_AT_EOL_OUTPUT   = 0x0002
-
-  var gOldConsoleModeInput: DWORD
-  var gOldConsoleMode: DWORD
-
-  proc consoleInit() =
-    discard getConsoleMode(getStdHandle(STD_INPUT_HANDLE), gOldConsoleModeInput.addr)
-    if gFullScreen:
-      if getConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), gOldConsoleMode.addr) != 0:
-        var mode = gOldConsoleMode and (not ENABLE_WRAP_AT_EOL_OUTPUT)
-        discard setConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), mode)
-
-  proc consoleDeinit() =
-    discard setConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), gOldConsoleMode)
-
-
-  func getKeyAsync(): Key =
-    var key = Key.None
-
-    if kbhit() > 0:
-      let c = getch()
-      case c:
-      of   0:
-        case getch():
-        of 59: key = Key.F1
-        of 60: key = Key.F2
-        of 61: key = Key.F3
-        of 62: key = Key.F4
-        of 63: key = Key.F5
-        of 64: key = Key.F6
-        of 65: key = Key.F7
-        of 66: key = Key.F8
-        of 67: key = Key.F9
-        of 68: key = Key.F10
-        else: discard getch()  # ignore unknown 2-key keycodes
-
-      of   8: key = Key.Backspace
-      of   9: key = Key.Tab
-      of  13: key = Key.Enter
-      of  32: key = Key.Space
-
-      of 224:
-        case getch():
-        of  72: key = Key.Up
-        of  75: key = Key.Left
-        of  77: key = Key.Right
-        of  80: key = Key.Down
-
-        of  71: key = Key.Home
-        of  82: key = Key.Insert
-        of  83: key = Key.Delete
-        of  79: key = Key.End
-        of  73: key = Key.PageUp
-        of  81: key = Key.PageDown
-
-        of 133: key = Key.F11
-        of 134: key = Key.F12
-        else: discard  # ignore unknown 2-key keycodes
-
-      else:
-        key = toKey(c)
-    result = key
-
-
-  proc writeConsole(hConsoleOutput: HANDLE, lpBuffer: pointer,
-                    nNumberOfCharsToWrite: DWORD,
-                    lpNumberOfCharsWritten: ptr DWORD,
-                    lpReserved: pointer): WINBOOL {.
-    stdcall, dynlib: "kernel32", importc: "WriteConsoleW".}
-
-  var hStdout = getStdHandle(STD_OUTPUT_HANDLE)
-  var utf16LEConverter = open(destEncoding = "utf-16", srcEncoding = "UTF-8")
-
-  proc put(s: string) =
-    var us = utf16LEConverter.convert(s)
-    var numWritten: DWORD
-    discard writeConsole(hStdout, pointer(us[0].addr), DWORD(s.runeLen),
-                         numWritten.addr, nil)
-
-
 when defined(posix):
   const
     XtermColor    = "xterm-color"
@@ -295,18 +121,6 @@ proc exitFullScreen() =
   else:
     eraseScreen()
     setCursorPos(0, 0)
-
-when defined(windows):
-  proc enableMouse(hConsoleInput: Handle) =
-    var currentMode: DWORD
-    discard getConsoleMode(hConsoleInput, currentMode.addr)
-    discard setConsoleMode(hConsoleInput,
-      ENABLE_WINDOW_INPUT or ENABLE_MOUSE_INPUT or ENABLE_EXTENDED_FLAGS or
-      (currentMode and ENABLE_QUICK_EDIT_MODE.bitnot())
-    )
-
-  proc disableMouse(hConsoleInput: Handle, oldConsoleMode: DWORD) =
-    discard setConsoleMode(hConsoleInput, oldConsoleMode) # TODO: REMOVE MOUSE OPTION ONLY?
 
 proc illwillInit*(fullScreen: bool = true, mouse: bool = false) =
   ## Initializes the terminal and enables non-blocking keyboard input. Needs
@@ -356,70 +170,6 @@ proc illwillDeinit*() =
   resetAttributes()
   showCursor()
 
-when defined(windows):
-  var gLastMouseInfo = MouseInfo()
-
-  proc fillGlobalMouseInfo(inputRecord: INPUT_RECORD) =
-    gMouseInfo.x = inputRecord.Event.MouseEvent.dwMousePosition.X
-    gMouseInfo.y = inputRecord.Event.MouseEvent.dwMousePosition.Y
-
-    case inputRecord.Event.MouseEvent.dwButtonState
-    of FROM_LEFT_1ST_BUTTON_PRESSED:
-      gMouseInfo.button = mbLeft
-    of FROM_LEFT_2ND_BUTTON_PRESSED:
-      gMouseInfo.button = mbMiddle
-    of RIGHTMOST_BUTTON_PRESSED:
-      gMouseInfo.button = mbRight
-    else:
-      gMouseInfo.button = mbNone
-
-    if gMouseInfo.button != mbNone:
-      gMouseInfo.action = MouseButtonAction.mbaPressed
-    elif gMouseInfo.button == mbNone and gLastMouseInfo.button != mbNone:
-      gMouseInfo.action = MouseButtonAction.mbaReleased
-    else:
-      gMouseInfo.action = MouseButtonAction.mbaNone
-
-    if gLastMouseInfo.x != gMouseInfo.x or gLastMouseInfo.y != gMouseInfo.y:
-      gMouseInfo.move = true
-    else:
-      gMouseInfo.move = false
-
-    if bitand(inputRecord.Event.MouseEvent.dwEventFlags, MOUSE_WHEELED) == MOUSE_WHEELED:
-      gMouseInfo.scroll = true
-      if inputRecord.Event.MouseEvent.dwButtonState.testBit(31):
-        gMouseInfo.scrollDir = ScrollDirection.sdDown
-      else:
-        gMouseInfo.scrollDir = ScrollDirection.sdUp
-    else:
-      gMouseInfo.scroll = false
-      gMouseInfo.scrollDir = ScrollDirection.sdNone
-
-    gMouseInfo.ctrl = bitand(inputRecord.Event.MouseEvent.dwControlKeyState, LEFT_CTRL_PRESSED) == LEFT_CTRL_PRESSED or
-        bitand(inputRecord.Event.MouseEvent.dwControlKeyState, RIGHT_CTRL_PRESSED) == RIGHT_CTRL_PRESSED
-
-    gMouseInfo.shift = bitand(inputRecord.Event.MouseEvent.dwControlKeyState, SHIFT_PRESSED) == SHIFT_PRESSED
-
-    gLastMouseInfo = gMouseInfo
-
-
-  proc hasMouseInput(): bool =
-    var buffer: array[INPUT_BUFFER_LEN, INPUT_RECORD]
-    var numberOfEventsRead: DWORD
-    var toRead: int = 0
-    discard peekConsoleInputA(getStdHandle(STD_INPUT_HANDLE), buffer.addr, buffer.len.DWORD, numberOfEventsRead.addr)
-    if numberOfEventsRead == 0: return false
-    for inputRecord in buffer[0..<numberOfEventsRead.int]:
-      toRead.inc()
-      if inputRecord.EventType == MOUSE_EVENT: break
-    if toRead == 0: return false
-    discard readConsoleInput(getStdHandle(STD_INPUT_HANDLE), buffer.addr, toRead.DWORD, numberOfEventsRead.addr)
-    if buffer[numberOfEventsRead - 1].EventType == MOUSE_EVENT:
-      fillGlobalMouseInfo(buffer[numberOfEventsRead - 1])
-      return true
-    else:
-      return false
-
 proc getKey*(): Key =
   ## Reads the next keystroke in a non-blocking manner. If there are no
   ## keypress events in the buffer, `Key.None` is returned.
@@ -434,22 +184,6 @@ proc getKey*(): Key =
     if result == Key.None:
       if hasMouseInput():
         return Key.Mouse
-
-
-proc `[]=`*(tb: var TerminalBuffer, x, y: Natural, ch: TerminalChar) =
-  ## Index operator to write a character into the terminal buffer at the
-  ## specified location. Does nothing if the location is outside of the
-  ## extents of the terminal buffer.
-  if x < tb.width and y < tb.height:
-    tb.buf[tb.width * y + x] = ch
-
-proc `[]`*(tb: TerminalBuffer, x, y: Natural): TerminalChar =
-  ## Index operator to read a character from the terminal buffer at the
-  ## specified location. Returns nil if the location is outside of the extents
-  ## of the terminal buffer.
-  if x < tb.width and y < tb.height:
-    result = tb.buf[tb.width * y + x]
-
 
 proc fill*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural, ch: string = " ") =
   ## Fills a rectangular area with the `ch` character using the current text
@@ -538,16 +272,17 @@ proc newTerminalBufferFrom*(src: TerminalBuffer): TerminalBuffer =
   result = tb
 
 proc setCursorPos*(tb: var TerminalBuffer, x, y: Natural) =
-  ## Sets the current cursor position.
+  ## Sets the current cursor position. X is the column and Y is the row. Both
+  ## columns and rows start at zero (0).
   tb.currX = x
   tb.currY = y
 
 proc setCursorXPos*(tb: var TerminalBuffer, x: Natural) =
-  ## Sets the current x cursor position.
+  ## Sets the current x (column) cursor position. Zero (0) is the first (left-most) column.
   tb.currX = x
 
 proc setCursorYPos*(tb: var TerminalBuffer, y: Natural) =
-  ## Sets the current y cursor position.
+  ## Sets the current y (row) cursor position. Zero (0) is the first (top) row.
   tb.currY = y
 
 proc setBackgroundColor*(tb: var TerminalBuffer, bg: BackgroundColor) =
@@ -568,15 +303,15 @@ proc setStyle*(tb: var TerminalBuffer, style: set[Style]) =
   tb.currStyle = style
 
 func getCursorPos*(tb: TerminalBuffer): tuple[x: Natural, y: Natural] =
-  ## Returns the current cursor position.
+  ## Returns the current cursor position. X is the column and Y is the row.
   result = (tb.currX, tb.currY)
 
 func getCursorXPos*(tb: TerminalBuffer): Natural =
-  ## Returns the current x cursor position.
+  ## Returns the current x (column) cursor position.
   result = tb.currX
 
 func getCursorYPos*(tb: TerminalBuffer): Natural =
-  ## Returns the current y cursor position.
+  ## Returns the current y (row) cursor position.
   result = tb.currY
 
 func getBackgroundColor*(tb: var TerminalBuffer): BackgroundColor =
@@ -653,59 +388,65 @@ proc setXPos(x: Natural) =
   setCursorXPos(x)
 
 proc displayFull(tb: TerminalBuffer) =
-  var buf = ""
+  when defined(js):
+    put tb
+  else:
+    var buf = ""
 
-  proc flushBuf() =
-    if buf.len > 0:
-      put buf
-      buf = ""
+    proc flushBuf() =
+      if buf.len > 0:
+        put buf
+        buf = ""
 
-  for y in 0..<tb.height:
-    setPos(0, y)
-    for x in 0..<tb.width:
-      let c = tb[x,y]
-      if c.bg != gCurrBg or c.fg != gCurrFg or c.style != gCurrStyle:
-        flushBuf()
-        setAttribs(c)
-      buf &= $c.ch
-    flushBuf()
+    for y in 0..<tb.height:
+      setPos(0, y)
+      for x in 0..<tb.width:
+        let c = tb[x,y]
+        if c.bg != gCurrBg or c.fg != gCurrFg or c.style != gCurrStyle:
+          flushBuf()
+          setAttribs(c)
+        buf &= $c.ch
+      flushBuf()
 
 
 proc displayDiff(tb: TerminalBuffer) =
-  var
-    buf = ""
-    bufXPos, bufYPos: Natural
-    currXPos = -1
-    currYPos = -1
-
-  proc flushBuf() =
-    if buf.len > 0:
-      if currYPos != bufYPos:
-        currXPos = bufXPos
-        currYPos = bufYPos
-        setPos(currXPos, currYPos)
-      elif currXPos != bufXPos:
-        currXPos = bufXPos
-        setXPos(currXPos)
-      put buf
-      inc(currXPos, buf.runeLen)
+  when defined(js):
+    put tb
+  else:
+    var
       buf = ""
+      bufXPos, bufYPos: Natural
+      currXPos = -1
+      currYPos = -1
 
-  for y in 0..<tb.height:
-    bufXPos = 0
-    bufYPos = y
-    for x in 0..<tb.width:
-      let c = tb[x,y]
-      if c != gPrevTerminalBuffer[x,y] or c.forceWrite:
-        if c.bg != gCurrBg or c.fg != gCurrFg or c.style != gCurrStyle:
+    proc flushBuf() =
+      if buf.len > 0:
+        if currYPos != bufYPos:
+          currXPos = bufXPos
+          currYPos = bufYPos
+          setPos(currXPos, currYPos)
+        elif currXPos != bufXPos:
+          currXPos = bufXPos
+          setXPos(currXPos)
+        put buf
+        inc(currXPos, buf.runeLen)
+        buf = ""
+
+    for y in 0..<tb.height:
+      bufXPos = 0
+      bufYPos = y
+      for x in 0..<tb.width:
+        let c = tb[x,y]
+        if c != gPrevTerminalBuffer[x,y] or c.forceWrite:
+          if c.bg != gCurrBg or c.fg != gCurrFg or c.style != gCurrStyle:
+            flushBuf()
+            bufXPos = x
+            setAttribs(c)
+          buf &= $c.ch
+        else:
           flushBuf()
-          bufXPos = x
-          setAttribs(c)
-        buf &= $c.ch
-      else:
-        flushBuf()
-        bufXPos = x+1
-    flushBuf()
+          bufXPos = x+1
+      flushBuf()
 
 
 var gDoubleBufferingEnabled = true
