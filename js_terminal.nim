@@ -1,33 +1,71 @@
 import
   unicode,
-  dom,
   tables
+import dom except Style
 
 import
   common
 
 let
-  fgColorMap = {
+  fgColorMapBright = {
       $fgNone: "white",
       $fgBlack: "black",
       $fgRed: "red",
-      $fgGreen: "green",
+      $fgGreen: "lime",
       $fgYellow: "yellow",
-      $fgBlue: "blue",
+      $fgBlue: "lightskyblue",
       $fgMagenta: "magenta",
       $fgCyan: "cyan",
-      $fgWhite: "white"
+      $fgWhite: "white",
+      $bgNone: "white",
+      $bgBlack: "black",
+      $bgRed: "red",
+      $bgGreen: "lime",
+      $bgYellow: "yellow",
+      $bgBlue: "lightskyblue",
+      $bgMagenta: "magenta",
+      $bgCyan: "cyan",
+      $bgWhite: "white"
+    }.toTable
+  fgColorMapDim = {
+      $fgNone: "gray",
+      $fgBlack: "black",
+      $fgRed: "crimson",
+      $fgGreen: "green",
+      $fgYellow: "goldenrod",
+      $fgBlue: "blue",
+      $fgMagenta: "mediumpurple",
+      $fgCyan: "aqua",
+      $fgWhite: "gray",
+      $bgNone: "gray",
+      $bgBlack: "black",
+      $bgRed: "crimson",
+      $bgGreen: "green",
+      $bgYellow: "goldenrod",
+      $bgBlue: "blue",
+      $bgMagenta: "mediumpurple",
+      $bgCyan: "aqua",
+      $bgWhite: "gray"
     }.toTable
   bgColorMap = {
       $bgNone: "black",
       $bgBlack: "black",
       $bgRed: "red",
-      $bgGreen: "green",
+      $bgGreen: "lime",
       $bgYellow: "yellow",
-      $bgBlue: "blue",
+      $bgBlue: "lightskyblue",
       $bgMagenta: "magenta",
       $bgCyan: "cyan",
-      $bgWhite: "white"
+      $bgWhite: "white",
+      $fgNone: "black",
+      $fgBlack: "black",
+      $fgRed: "red",
+      $fgGreen: "lime",
+      $fgYellow: "yellow",
+      $fgBlue: "lightskyblue",
+      $fgMagenta: "magenta",
+      $fgCyan: "cyan",
+      $fgWhite: "white"
     }.toTable
 
 
@@ -109,25 +147,78 @@ proc disableMouse*() =
   discard
 
 
-proc genStartSpan(fg: ForegroundColor, bg: BackgroundColor): string =
-  result = "<span style=\"color: "
-  result &= fgColorMap[$fg]
-  result &= "; background-color: "
-  result &= bgColorMap[$bg]
-  result &= ";\">"
+proc genStartSpan(fg: ForegroundColor, bg: BackgroundColor, st: set[Style]): string =
+  result = "<span style=\""
+  #
+  # foreground
+  #
+  result &= "color: "
+  if styleHidden in st:
+    result &= "transparent;"
+  else:
+    if styleReverse in st:
+      if styleDim in st:
+        result &= fgColorMapDim[$bg]
+      else:
+        result &= fgColorMapBright[$bg]
+      result &= ";"
+    else:
+      if styleDim in st:
+        result &= fgColorMapDim[$fg]
+      else:
+        result &= fgColorMapBright[$fg]
+      result &= ";"
+  #
+  # background
+  #
+  result &= " background-color: "
+  if styleReverse in st:
+    result &= bgColorMap[$fg]
+    result &= ";"
+  else:
+    result &= bgColorMap[$bg]
+    result &= ";"
+  #
+  # font styles
+  #
+  if styleItalic in st:
+    result &= " font-style: italic;"
+  if styleUnderscore in st:
+    if styleStrikethrough in st:
+      result &= " text-decoration: underline line-through;"
+    else:
+      result &= " text-decoration: underline;"
+  elif styleStrikethrough in st:
+    result &= " text-decoration: line-through;"
+  #
+  result &= "\""  # 'style=' ends
+  #
+  # blinking classes
+  #
+  if styleBlink in st:
+    if styleBlinkRapid in st:
+      result &= " class=\"blink blinkrapid\""
+    else:
+      result &= " class=\"blink\""
+  elif styleBlinkRapid in st:
+    result &= " class=\"blinkrapid\""
+  #
+  result &= ">"
 
 
 proc genRowHtml(tb: TerminalBuffer, row: int): string =
   var fg = tb[0, row].fg
   var bg = tb[0, row].bg
-  result = genStartSpan(fg, bg)
+  var st = tb[0, row].style
+  result = genStartSpan(fg, bg, st)
   for col in 0 ..< tb.width:
     let c = tb[col, row]
-    if (c.fg != fg) or (c.bg != bg):
+    if (c.fg != fg) or (c.bg != bg) or (c.style != st):
       result &= "</span>"
-      result &= genStartSpan(c.fg, c.bg)
+      result &= genStartSpan(c.fg, c.bg, c.style)
       fg = c.fg
       bg = c.bg
+      st = c.style
     if cursorBlockVisible and (row == cursorY) and (col == cursorX):
       result &= "█"
     else:

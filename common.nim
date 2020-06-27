@@ -22,16 +22,17 @@ type
     bgMagenta,              ## magenta
     bgCyan,                 ## cyan
     bgWhite                 ## white
+
   Style* = enum
-    styleBright = 1,              ## bright text
-    styleDim,                   ## dim text
-    styleItalic,                ## italic (or reverse on terminals not supporting)
-    styleUnderscore,            ## underscored text
-    styleBlink,                 ## blinking/bold text
-    styleBlinkRapid,            ## rapid blinking/bold text (not widely supported)
-    styleReverse,               ## reverse
-    styleHidden,                ## hidden text
-    styleStrikethrough          ## strikethrough
+    styleBright = 1,        ## bright text
+    styleDim,               ## dim text
+    styleItalic,            ## italic (or reverse on terminals not supporting)
+    styleUnderscore,        ## underscored text
+    styleBlink,             ## blinking/bold text
+    styleBlinkRapid,        ## rapid blinking/bold text (not widely supported)
+    styleReverse,           ## reverse
+    styleHidden,            ## hidden text
+    styleStrikethrough      ## strikethrough
 
   Key* {.pure.} = enum      ## Supported single key presses and key combinations
     None = (-1, "None"),
