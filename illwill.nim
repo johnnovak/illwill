@@ -911,16 +911,12 @@ proc startInputLine*(
       userInputMaxLen = strLen
   else:
     userInputMaxLen = 1
-  showCursor()
   tb.setCursorPos(goodX, y)
+  showCursor()
   userInputColumn = goodX
-  if strDefault.len == 0:
-    # when defined(posix):
-    #   tb.write("")
-    # else:
-    discard
-  else:
+  if strDefault.len > 0:
     tb.write(strDefault)
+  tb.displayFull()
 
 proc inputLineReady*(tb: var TerminalBuffer): bool =
   if userInputExitKey != Key.None:

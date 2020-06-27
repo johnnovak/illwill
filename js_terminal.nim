@@ -41,9 +41,12 @@ var
 var
   cursorX = 0
   cursorY = 0
+  cursorOn = false
+  cursorBlockVisible = false 
 
 var
   globalTimer*: ref Interval
+  cursorTimer*: ref Interval
 
 
 proc setAttribs*(c: TerminalChar) =
@@ -80,11 +83,13 @@ proc terminalSize*(): tuple[w, h: int] =
 
 
 proc showCursor*() =
-  discard
+  cursorOn = true
+  cursorBlockVisible = true
 
 
 proc hideCursor*() =
-  discard
+  cursorOn = false
+  cursorBlockVisible = false
 
 
 proc setCursorPos*(x, y: Natural) =
@@ -123,7 +128,10 @@ proc genRowHtml(tb: TerminalBuffer, row: int): string =
       result &= genStartSpan(c.fg, c.bg)
       fg = c.fg
       bg = c.bg
-    result &= $c.ch
+    if cursorBlockVisible and (row == cursorY) and (col == cursorX):
+      result &= "█"
+    else:
+      result &= $c.ch
   result &= "</span>"
 
 
@@ -131,6 +139,7 @@ proc applyTbToPre(tb: TerminalBuffer) =
   if preTag.isNil:
     echo "not loaded yet"
     return
+  setCursorPos(tb.currX, tb.currY)
   var newHtml = ""
   for row in 0 ..< tb.height:
     newHtml &= tb.genRowHtml(row)
@@ -140,13 +149,7 @@ proc applyTbToPre(tb: TerminalBuffer) =
 
 
 proc eraseScreen*() =
-  # TODO
   discard
-  # if not preTag.isNil:
-  #   cursorColumn = 0
-  #   cursorRow = 0
-  #   resetScreenRows()
-  #   splashIntoPreTag()
 
 
 proc put*(tb: TerminalBuffer) = 
@@ -198,6 +201,13 @@ proc dummyInterval() =
   discard
 
 
+proc cursorBlinker() =
+  if cursorOn:
+    cursorBlockVisible = not cursorBlockVisible
+  else:
+    cursorBlockVisible = false
+
+
 proc consoleInit*() =
   window.addEventListener(
     "keydown".cstring,
@@ -205,12 +215,14 @@ proc consoleInit*() =
     false
   )
   globalTimer = window.setInterval(dummyInterval, 6000)
+  globalTimer = window.setInterval(cursorBlinker, 800)
   if not preTag.isNil:
     preTag.disabled = false
 
 
 proc consoleDeInit*() =
   window.clearInterval(globalTimer)
+  window.clearInterval(cursorTimer)
   window.removeEventListener(
     "keydown".cstring, 
     onkeydown
@@ -231,8 +243,8 @@ template timerLoop*(msDelay: int, content: untyped): untyped =
 proc illwillOnLoad*(domId: cstring, cols, rows: int) {.exportc.} =
   preTagId = domId
   preTag = document.getElementById(domId)
+  preTagColumnSize = cols
+  preTagRowSize = rows
   if preTag.isNil:
     echo "ERROR: illwillOnLoad cannot find the id of \"" & $domId & "\""
     return
-  preTagColumnSize = cols
-  preTagRowSize = rows

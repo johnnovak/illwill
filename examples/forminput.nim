@@ -13,8 +13,7 @@ var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
 setControlCHook(exitProc)
 
 tb.write(10, 3, fgYellow, "SAMPLE SURVEY")
-tb.write(0, 7, fgGreen, "1.", fgWhite, " Favorite color: ", bgBlue, "                     ", bgBlack)
-tb.write(0, 9, fgGreen, "2.", fgWhite, " Favorite sound: ", bgBlue, "                     ")
+tb.write(0, 7, fgGreen, "1.", fgWhite, " Favorite color: ", bgBlue, "                     ")
 
 let qsize = "1. Favorite color: ".len
 
@@ -28,7 +27,6 @@ var answer2 = ""
 timerLoop(20): # make sure each loop finishes in 20 ms or less
   case step:
   of 1:
-    tb.setForegroundColor(fgGreen, true)
     tb.startInputLine(qsize, 7, "", 20)
     step = 2
   of 2:
@@ -36,6 +34,7 @@ timerLoop(20): # make sure each loop finishes in 20 ms or less
       answer1 = getInputLineText()
       step = 3
   of 3:
+    tb.write(0, 9, bgBlack, fgGreen, "2.", fgWhite, " Favorite sound: ", bgBlue, "                     ")
     tb.startInputLine(qsize, 9, "zippity", 20)
     step = 4
   of 4:
