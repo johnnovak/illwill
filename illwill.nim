@@ -60,6 +60,12 @@ export BackgroundColor
 export Style
 export Key
 export IllwillError
+export TerminalBuffer
+export TerminalChar
+export MouseButtonAction
+export MouseInfo
+export MouseButton
+export ScrollDirection
 
 proc getMouse*(): MouseInfo =
   ## When `illwillInit(mouse=true)` all mouse movements and clicks are captured.

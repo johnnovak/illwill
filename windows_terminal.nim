@@ -1,6 +1,43 @@
-import encodings, unicode, winlean
+import 
+  encodings, 
+  unicode, 
+  winlean,
+  bitops,
+  terminal
+
+export terminalWidth
+export terminalHeight
+export terminalSize
+export hideCursor
+export showCursor
+export getStdHandle
+export STD_INPUT_HANDLE
 
 import common
+
+export resetAttributes
+export eraseScreen
+export setCursorPos
+export setCursorXPos
+
+# export getEnv
+
+proc envSetForegroundColor*(bg: int) =
+  setForegroundColor(terminal.ForegroundColor(bg))
+
+proc envSetBackgroundColor*(bg: int) =
+  setBackgroundColor(terminal.BackgroundColor(bg))
+
+proc envSetStyle*(style: set[common.Style]) =
+  var newStyle: set[terminal.Style] = {}
+  for s in style.items:
+    newStyle.incl(terminal.Style(s))
+  setStyle(newStyle)
+
+template timerLoop*(msDelay: int, content: untyped): untyped =
+  while true:
+    content
+    sleep(msDelay)
 
 proc kbhit(): cint {.importc: "_kbhit", header: "<conio.h>".}
 proc getch(): cint {.importc: "_getch", header: "<conio.h>".}
@@ -98,21 +135,21 @@ proc peekConsoleInputA(hConsoleInput: HANDLE, lpBuffer: PINPUT_RECORD, nLength: 
 const
   ENABLE_WRAP_AT_EOL_OUTPUT   = 0x0002
 
-var gOldConsoleModeInput: DWORD
-var gOldConsoleMode: DWORD
+var gOldConsoleModeInput*: DWORD
+var gOldConsoleMode*: DWORD
 
-proc consoleInit() =
+proc consoleInit*() =
   discard getConsoleMode(getStdHandle(STD_INPUT_HANDLE), gOldConsoleModeInput.addr)
   if gFullScreen:
     if getConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), gOldConsoleMode.addr) != 0:
       var mode = gOldConsoleMode and (not ENABLE_WRAP_AT_EOL_OUTPUT)
       discard setConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), mode)
 
-proc consoleDeinit() =
+proc consoleDeinit*() =
   discard setConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), gOldConsoleMode)
 
 
-func getKeyAsync(): Key =
+func getKeyAsync*(): Key =
   var key = Key.None
 
   if kbhit() > 0:
@@ -186,7 +223,7 @@ proc enableMouse*(hConsoleInput: Handle) =
 proc disableMouse*(hConsoleInput: Handle, oldConsoleMode: DWORD) =
   discard setConsoleMode(hConsoleInput, oldConsoleMode) # TODO: REMOVE MOUSE OPTION ONLY?
 
-  var gLastMouseInfo = MouseInfo()
+var gLastMouseInfo* = MouseInfo()
 
 proc fillGlobalMouseInfo(inputRecord: INPUT_RECORD) =
   gMouseInfo.x = inputRecord.Event.MouseEvent.dwMousePosition.X
@@ -232,7 +269,7 @@ proc fillGlobalMouseInfo(inputRecord: INPUT_RECORD) =
   gLastMouseInfo = gMouseInfo
 
 
-proc hasMouseInput(): bool =
+proc hasMouseInput*(): bool =
   var buffer: array[INPUT_BUFFER_LEN, INPUT_RECORD]
   var numberOfEventsRead: DWORD
   var toRead: int = 0
