@@ -126,6 +126,10 @@ proc illwillInit*(fullScreen: bool = true, mouse: bool = false) =
   ## Initializes the terminal and enables non-blocking keyboard input. Needs
   ## to be called before doing anything with the library.
   ##
+  ## if fullScreen is set to true and the target is a POSIX terminal (MacOS,
+  ## Linux, etc.), then the current screen is saved and will be restored
+  ## when illwillDeinit is invoked.
+  ##
   ## If mouse is set to true, all mouse actions are captured.
   ## Call `getMouse()` in your main loop to actually retrieve them.
   ##
@@ -876,3 +880,98 @@ proc drawRect*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural,
   var bb = newBoxBuffer(tb.width, tb.height)
   bb.drawRect(x1, y1, x2, y2, doubleStyle)
   tb.write(bb)
+
+var
+  userInputText = ""
+  userInputExitKey = Key.None
+  userInputMaxLen = 1
+  userInputColumn = 0
+  userInputAllowTabArrow = false
+
+proc startInputLine*(
+                      tb: var TerminalBuffer, 
+                      x: int, 
+                      y: int, 
+                      strDefault: string, 
+                      strLen: int, 
+                      allowTabArrowExit = false
+                    ) =
+  var goodX = x
+  userInputText = strDefault
+  userInputExitKey = Key.None
+  userInputAllowTabArrow = allowTabArrowExit
+  if strLen > 0:
+    let remainingSpace = tb.width - x - 2
+    if remainingSpace < 1:
+      goodX = tb.width - 2
+      userInputMaxLen = 1
+    elif remainingSpace < strLen:
+      userInputMaxLen = remainingSpace
+    else:
+      userInputMaxLen = strLen
+  else:
+    userInputMaxLen = 1
+  showCursor()
+  tb.setCursorPos(goodX, y)
+  userInputColumn = goodX
+  if strDefault.len == 0:
+    # when defined(posix):
+    #   tb.write("")
+    # else:
+    discard
+  else:
+    tb.write(strDefault)
+
+proc inputLineReady*(tb: var TerminalBuffer): bool =
+  if userInputExitKey != Key.None:
+    result = true
+    return
+  result = false
+
+  let key = getKey()
+  case key
+  of Key.None:
+    discard
+  of Key.Enter:
+    result = true
+    userInputExitKey = key
+    hideCursor()
+  of Key.Tab:
+    if userInputAllowTabArrow:
+      result = true
+      userInputExitKey = key
+      hideCursor()
+  of Key.Up:
+    if userInputAllowTabArrow:
+      result = true
+      userInputExitKey = key
+      hideCursor()
+  of Key.Down:
+    if userInputAllowTabArrow:
+      result = true
+      userInputExitKey = key
+      hideCursor()
+  of Key.Escape:
+    if userInputAllowTabArrow:
+      result = true
+      userInputExitKey = key
+      hideCursor()
+  of Key.Backspace:
+    if userInputText.len > 0:
+      userInputText = userInputText[0 .. ^2]
+      tb.setCursorXPos(userInputColumn)
+      tb.write(userInputText & " ")
+      tb.setCursorXPos(userInputColumn)
+      tb.write(userInputText)
+  else:
+    let r = key.toRunes
+    if r.len > 0:
+      if userInputText.len < userInputMaxLen:
+        tb.write($r)
+        userInputText &= $r
+
+proc getInputLineText*(): string =
+  result = userInputText
+
+proc getInputLineExitKey*(): Key =
+  result = userInputExitKey
