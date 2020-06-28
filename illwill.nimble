@@ -32,5 +32,5 @@ task examplesDebug, "Compiles the examples (debug mode)":
   exec "nim c examples/mouseMinimal.nim"
 
 task docgen, "Generate HTML documentation":
-  exec "nim doc -o:doc/illwill.html illwill"
+  exec "nim doc --d:docgenonly -o:doc/illwill.html illwill.nim"
 

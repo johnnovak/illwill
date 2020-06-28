@@ -22,32 +22,321 @@
 ## `echo`, `write` or other similar functions for output. You should **only**
 ## use the interface provided by the module to interact with the terminal.
 ##
-## The following symbols are exported from the terminal_ module (these are
-## safe to use):
-##
-## * `terminalWidth() <https://nim-lang.org/docs/terminal.html#terminalWidth>`_
-## * `terminalHeight() <https://nim-lang.org/docs/terminal.html#terminalHeight>`_
-## * `terminalSize() <https://nim-lang.org/docs/terminal.html#terminalSize>`_
-## * `hideCursor() <https://nim-lang.org/docs/terminal.html#hideCursor.t>`_
-## * `showCursor() <https://nim-lang.org/docs/terminal.html#showCursor.t>`_
-## * `Style <https://nim-lang.org/docs/terminal.html#Style>`_
-##
 ## When compiled for Javascript (JS), the `echo` command is safe to use but it's
 ## output is sent to the debug console NOT the psuedo-terminal.
 ## 
+## Types (section 1 of 2)
+## ======================
+##
+## .. code:: nim
+##
+##     ForegroundColor* = enum
+##       fgNone = 0,             ## default
+##       fgBlack = 30,           ## black
+##       fgRed,                  ## red
+##       fgGreen,                ## green
+##       fgYellow,               ## yellow
+##       fgBlue,                 ## blue
+##       fgMagenta,              ## magenta
+##       fgCyan,                 ## cyan
+##       fgWhite                 ## white
+##
+##   Foreground colors
+##
+## .. code:: nim
+##
+##     BackgroundColor* = enum
+##       bgNone = 0,             ## default (transparent)
+##       bgBlack = 40,           ## black
+##       bgRed,                  ## red
+##       bgGreen,                ## green
+##       bgYellow,               ## yellow
+##       bgBlue,                 ## blue
+##       bgMagenta,              ## magenta
+##       bgCyan,                 ## cyan
+##       bgWhite                 ## white
+##
+##   Background colors
+##
+## .. code:: nim
+##
+##     Style* = enum
+##       styleBright = 1,        ## bright text
+##       styleDim,               ## dim text
+##       styleItalic,            ## italic (or reverse on terminals not supporting)
+##       styleUnderscore,        ## underscored text
+##       styleBlink,             ## blinking/bold text
+##       styleBlinkRapid,        ## rapid blinking/bold text (not widely supported)
+##       styleReverse,           ## reverse
+##       styleHidden,            ## hidden text
+##       styleStrikethrough      ## strikethrough
+##
+##   Styles of Text
+##
+## .. code:: nim
+##
+##     Key* {.pure.} = enum
+##       None = (-1, "None"),
+##       CtrlA  = (1, "CtrlA"),
+##       CtrlB  = (2, "CtrlB"),
+##       CtrlC  = (3, "CtrlC"),
+##       CtrlD  = (4, "CtrlD"),
+##       CtrlE  = (5, "CtrlE"),
+##       CtrlF  = (6, "CtrlF"),
+##       CtrlG  = (7, "CtrlG"),
+##       CtrlH  = (8, "CtrlH"),
+##       Tab    = (9, "Tab"),
+##       CtrlJ  = (10, "CtrlJ"),
+##       CtrlK  = (11, "CtrlK"),
+##       CtrlL  = (12, "CtrlL"),
+##       Enter  = (13, "Enter"),
+##       CtrlN  = (14, "CtrlN"),
+##       CtrlO  = (15, "CtrlO"),
+##       CtrlP  = (16, "CtrlP"),
+##       CtrlQ  = (17, "CtrlQ"),
+##       CtrlR  = (18, "CtrlR"),
+##       CtrlS  = (19, "CtrlS"),
+##       CtrlT  = (20, "CtrlT"),
+##       CtrlU  = (21, "CtrlU"),
+##       CtrlV  = (22, "CtrlV"),
+##       CtrlW  = (23, "CtrlW"),
+##       CtrlX  = (24, "CtrlX"),
+##       CtrlY  = (25, "CtrlY"),
+##       CtrlZ  = (26, "CtrlZ"),
+##       Escape = (27, "Escape"),
+##       CtrlBackslash    = (28, "CtrlBackslash"),
+##       CtrlRightBracket = (29, "CtrlRightBracket"),
+##       Space           = (32, "Space"),
+##       ExclamationMark = (33, "ExclamationMark"),
+##       DoubleQuote     = (34, "DoubleQuote"),
+##       Hash            = (35, "Hash"),
+##       Dollar          = (36, "Dollar"),
+##       Percent         = (37, "Percent"),
+##       Ampersand       = (38, "Ampersand"),
+##       SingleQuote     = (39, "SingleQuote"),
+##       LeftParen       = (40, "LeftParen"),
+##       RightParen      = (41, "RightParen"),
+##       Asterisk        = (42, "Asterisk"),
+##       Plus            = (43, "Plus"),
+##       Comma           = (44, "Comma"),
+##       Minus           = (45, "Minus"),
+##       Dot             = (46, "Dot"),
+##       Slash           = (47, "Slash"),
+##       Zero  = (48, "Zero"),
+##       One   = (49, "One"),
+##       Two   = (50, "Two"),
+##       Three = (51, "Three"),
+##       Four  = (52, "Four"),
+##       Five  = (53, "Five"),
+##       Six   = (54, "Six"),
+##       Seven = (55, "Seven"),
+##       Eight = (56, "Eight"),
+##       Nine  = (57, "Nine"),
+##       Colon        = (58, "Colon"),
+##       Semicolon    = (59, "Semicolon"),
+##       LessThan     = (60, "LessThan"),
+##       Equals       = (61, "Equals"),
+##       GreaterThan  = (62, "GreaterThan"),
+##       QuestionMark = (63, "QuestionMark"),
+##       At           = (64, "At"),
+##       ShiftA  = (65, "ShiftA"),
+##       ShiftB  = (66, "ShiftB"),
+##       ShiftC  = (67, "ShiftC"),
+##       ShiftD  = (68, "ShiftD"),
+##       ShiftE  = (69, "ShiftE"),
+##       ShiftF  = (70, "ShiftF"),
+##       ShiftG  = (71, "ShiftG"),
+##       ShiftH  = (72, "ShiftH"),
+##       ShiftI  = (73, "ShiftI"),
+##       ShiftJ  = (74, "ShiftJ"),
+##       ShiftK  = (75, "ShiftK"),
+##       ShiftL  = (76, "ShiftL"),
+##       ShiftM  = (77, "ShiftM"),
+##       ShiftN  = (78, "ShiftN"),
+##       ShiftO  = (79, "ShiftO"),
+##       ShiftP  = (80, "ShiftP"),
+##       ShiftQ  = (81, "ShiftQ"),
+##       ShiftR  = (82, "ShiftR"),
+##       ShiftS  = (83, "ShiftS"),
+##       ShiftT  = (84, "ShiftT"),
+##       ShiftU  = (85, "ShiftU"),
+##       ShiftV  = (86, "ShiftV"),
+##       ShiftW  = (87, "ShiftW"),
+##       ShiftX  = (88, "ShiftX"),
+##       ShiftY  = (89, "ShiftY"),
+##       ShiftZ  = (90, "ShiftZ"),
+##       LeftBracket  = (91, "LeftBracket"),
+##       Backslash    = (92, "Backslash"),
+##       RightBracket = (93, "RightBracket"),
+##       Caret        = (94, "Caret"),
+##       Underscore   = (95, "Underscore"),
+##       GraveAccent  = (96, "GraveAccent"),
+##       A = (97, "A"),
+##       B = (98, "B"),
+##       C = (99, "C"),
+##       D = (100, "D"),
+##       E = (101, "E"),
+##       F = (102, "F"),
+##       G = (103, "G"),
+##       H = (104, "H"),
+##       I = (105, "I"),
+##       J = (106, "J"),
+##       K = (107, "K"),
+##       L = (108, "L"),
+##       M = (109, "M"),
+##       N = (110, "N"),
+##       O = (111, "O"),
+##       P = (112, "P"),
+##       Q = (113, "Q"),
+##       R = (114, "R"),
+##       S = (115, "S"),
+##       T = (116, "T"),
+##       U = (117, "U"),
+##       V = (118, "V"),
+##       W = (119, "W"),
+##       X = (120, "X"),
+##       Y = (121, "Y"),
+##       Z = (122, "Z"),
+##       LeftBrace  = (123, "LeftBrace"),
+##       Pipe       = (124, "Pipe"),
+##       RightBrace = (125, "RightBrace"),
+##       Tilde      = (126, "Tilde"),
+##       Backspace  = (127, "Backspace"),
+##       # Special characters with virtual keycodes
+##       Up       = (1001, "Up"),
+##       Down     = (1002, "Down"),
+##       Right    = (1003, "Right"),
+##       Left     = (1004, "Left"),
+##       Home     = (1005, "Home"),
+##       Insert   = (1006, "Insert"),
+##       Delete   = (1007, "Delete"),
+##       End      = (1008, "End"),
+##       PageUp   = (1009, "PageUp"),
+##       PageDown = (1010, "PageDown"),
+##       F1  = (1011, "F1"),
+##       F2  = (1012, "F2"),
+##       F3  = (1013, "F3"),
+##       F4  = (1014, "F4"),
+##       F5  = (1015, "F5"),
+##       F6  = (1016, "F6"),
+##       F7  = (1017, "F7"),
+##       F8  = (1018, "F8"),
+##       F9  = (1019, "F9"),
+##       F10 = (1020, "F10"),
+##       F11 = (1021, "F11"),
+##       F12 = (1022, "F12"),
+##       Mouse = (5000, "Mouse")
+##
+##   Supported single key presses and key combinations
+##
+## .. code:: nim
+##
+##     MouseButtonAction* {.pure.} = enum
+##       mbaNone, mbaPressed, mbaReleased
+##
+## .. code:: nim
+##
+##     MouseInfo* = object
+##       x*: int ## x mouse position
+##       y*: int ## y mouse position
+##       button*: MouseButton ## which button was pressed
+##       action*: MouseButtonAction ## if button was released or pressed
+##       ctrl*: bool ## was ctrl was down on event
+##       shift*: bool ## was shift was down on event
+##       scroll*: bool ## if this is a mouse scroll
+##       scrollDir*: ScrollDirection
+##       move*: bool ## if this a mouse move
+##
+## .. code:: nim
+##
+##     MouseButton* {.pure.} = enum
+##       mbNone, mbLeft, mbMiddle, mbRight
+##
+## .. code:: nim
+##
+##     ScrollDirection* {.pure.} = enum
+##       sdNone, sdUp, sdDown
+##
+## .. code:: nim
+##
+##     TerminalChar* = object
+##       ch*: Rune
+##       fg*: ForegroundColor
+##       bg*: BackgroundColor
+##       style*: set[Style]
+##       forceWrite*: bool
+##
+##   Represents a character in the terminal buffer, including color and
+##   style information.
+##
+##   If `forceWrite` is set to `true`, the character is always output even
+##   when double buffering is enabled (this is a hack to achieve better
+##   continuity of horizontal lines when using UTF-8 box drawing symbols in
+##   the Windows Console).
+##
+## .. code:: nim
+##
+##     TerminalBuffer* = ref object
+##       width*: int
+##       height*: int
+##       buf*: seq[TerminalChar]
+##       currBg*: BackgroundColor
+##       currFg*: ForegroundColor
+##       currStyle*: set[Style]
+##       currX*: Natural
+##       currY*: Natural
+##
+##   A virtual terminal buffer of a fixed width and height. It remembers the
+##   current color and style settings and the current cursor position.
+##
+##   Write to the terminal buffer with `TerminalBuffer.write()` or access
+##   the character buffer directly with the index operators.
+##
+##   Example:
+##
+##   .. code-block::
+##        import illwill, unicode
+##
+##        # Initialise the console in non-fullscreen mode
+##        illwillInit(fullscreen=false)
+##
+##        # Create a new terminal buffer
+##        var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
+##
+##        # Write the character "X" at position (5,5) then read it back
+##        tb[5,5] = TerminalChar(ch: "X".runeAt(0), fg: fgYellow, bg: bgNone, style: {})
+##        let ch = tb[5,5]
+##
+##        # Write "foo" at position (10,10) in bright red
+##        tb.setForegroundColor(fgRed, bright=true)
+##        tb.setCursorPos(10, 10)
+##        tb.write("foo")
+##
+##        # Write "bar" at position (15,12) in bright red, without changing
+##        # the current cursor position
+##        tb.write(15, 12, "bar")
+##
+##        tb.write(0, 20, "Normal ", fgYellow, "ESC", fgWhite,
+##                        " or ", fgYellow, "Q", fgWhite, " to quit")
+##
+##        # Output the contents of the buffer to the terminal
+##        tb.display()
+##
+##        # Clean up
+##        illwillDeinit()
+##
 
 import macros, unicode
 
 when defined(windows):
-  import windows_terminal
+  import windows_terminal as env_terminal
 elif defined(posix):
-  import posix_terminal
+  import posix_terminal as env_terminal
 elif defined(js):
-  import js_terminal
+  import js_terminal as env_terminal
 
 export terminalWidth
 export terminalHeight
-export terminalSize
 export hideCursor
 export showCursor
 export timerLoop
@@ -66,6 +355,29 @@ export MouseButtonAction
 export MouseInfo
 export MouseButton
 export ScrollDirection
+
+proc terminalWidth*(): int =
+  ## From the context of the current terminal, returns the number of columns.
+  result = env_terminal.terminalWidth()
+
+proc terminalHeight*(): int =
+  ## From the context of the current terminal, returns the number of rows.
+  result = env_terminal.terminalHeight()
+
+proc terminalSize*(): tuple[w, h: int] =
+  result = env_terminal.terminalSize()
+  ## Returns the terminal width and height as a tuple. Internally calls
+  ## terminalWidth and terminalHeight, so the same assumptions apply.
+
+proc showCursor*() =
+  ## Shows the terminal cursor. In other words, the cursor can be seen
+  ## at it's current position by end user.
+  env_terminal.showCursor()
+
+proc hideCursor*() =
+  ## Hides the terminal cursor. In other words, the cursor becomes hidden from
+  ## the end user; even displaying new text.
+  env_terminal.hideCursor()
 
 proc getMouse*(): MouseInfo =
   ## When `illwillInit(mouse=true)` all mouse movements and clicks are captured.

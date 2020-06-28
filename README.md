@@ -19,15 +19,16 @@ a full-blown GUI.
 ### Main features
 
 * **Non-blocking** keyboard input.
-* Support for **key combinations** and **special keys** available both in the standard
-  Windows Console (`cmd.exe`) and most common POSIX terminals.
+* Support for Windows Console (`cmd.exe`), POSIX (MacOS/Linux terminals), and 
+  Javascript (web broswer).
+* Support for **key combinations** and **special keys** available.
 * **Virtual terminal buffers** with **double-buffering** support (only display changes
   from the previous frame and minimise the number of attribute changes to
   reduce CPU usage).
 * Simple graphics using **UTF-8 box drawing** symbols.
 * **Full-screen support** with restoring the contents of the terminal after exit.
 * **Mouse support** with modifier key reporting.
-* **No dependencies**—only depends on the standard terminal module.
+* **No dependencies**—only depends on the modules in the standard library.
 
 <img src="https://github.com/johnnovak/illwill/raw/master/img/nim-mod-1.png" align="left" width="48%" alt="illwill in action" />
 <img src="https://github.com/johnnovak/illwill/raw/master/img/nim-mod-2.png" width="48%" alt="illwill in action" />
@@ -40,8 +41,8 @@ player that uses illwill for its awesome text-mode user interface</em></p>
 ### Use it if
 
 * You just want something simple that lets you write full-screen terminal
-  apps with non-blocking keyboard input that work on Windows, Mac OS X and
-  99.99% of modern Linux distributions.
+  apps with non-blocking keyboard input that work on Windows, Mac OS X, 
+  99.99% of modern Linux distributions, or any modern web browsers.
 * You don't need to support any fancy encodings and terminal types other than
   UTF-8.
 * You're developing a custom UI so you don't need any predefined widgets.
@@ -61,7 +62,7 @@ player that uses illwill for its awesome text-mode user interface</em></p>
 * Suspend/resume (SIGTSTP/SIGCONT handling) works, but it doesn't properly
   reset the terminal when suspending the app.
 * The contents of the terminal is not restored after exiting a full-screen app
-  on Windows.
+  on Windows or Javascript.
 
 ## Installation
 
@@ -79,7 +80,7 @@ application. Check out the [examples](/examples) for more advanced use cases
 (e.g. using box drawing buffers, handling terminal resizes, etc.)
 
 
-```nimrod
+```nim
 import os, strutils
 import illwill
 
@@ -101,7 +102,7 @@ hideCursor()
 var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
 
 # 3. Display some simple static UI that doesn't change from frame to frame.
-tb.setForegroundColor(fgBlack, true)
+tb.setForegroundColor(fgBlue, true)
 tb.drawRect(0, 0, 40, 5)
 tb.drawHorizLine(2, 38, 3, doubleStyle=true)
 
@@ -113,7 +114,7 @@ tb.write(2, 2, "Press ", fgYellow, "ESC", fgWhite,
 # user input (keypress events), do something based on the input, modify the
 # contents of the terminal buffer (if necessary), and then display the new
 # frame.
-while true:
+timerLoop(20):
   var key = getKey()
   case key
   of Key.None: discard
@@ -123,9 +124,19 @@ while true:
     tb.write(2, 4, resetStyle, "Key pressed: ", fgGreen, $key)
 
   tb.display()
-  sleep(20)
-
 ```
+
+To compile for Windows (from Windows):
+
+  `nim c example.nim` generates `example.exe`
+
+To compile for MacOS or Linux (from corresponding OS):
+
+  `nim c example.nim` generates `example`
+
+To compile for the web (from any platform):
+
+  `nim js example.nim` generates `example.js`. This will need to be pulled by an HTML file.
 
 ## License
 
