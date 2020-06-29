@@ -335,11 +335,6 @@ elif defined(posix):
 elif defined(js):
   import js_terminal as env_terminal
 
-export terminalWidth
-export terminalHeight
-export hideCursor
-export showCursor
-export timerLoop
 export setControlCHook
 
 import common
@@ -809,6 +804,7 @@ proc display*(tb: TerminalBuffer) =
     when not defined(js):
       flushFile(stdout)
     gFullRedrawNextFrame = false
+  setCursorPos(tb.currX, tb.currY) # critical for an up-to-date visual cursor
 
 type BoxChar = int
 
@@ -1214,6 +1210,21 @@ proc startInputLine*(
                       strLen: int, 
                       allowTabArrowExit = false
                     ) =
+  ## Setup the terminal for gathering text from the terminal user.
+  ##
+  ## The ``strDefault`` value is displayed at the column (x) and row(y). The
+  ## cursor is then moved to the end of that value and shown.
+  ##
+  ## If the column is too close the right edge fo the screen, then the length
+  ## is adjusted to account for that.
+  ##
+  ## This procedure does NOT actually gather then number. Instead, future calls
+  ## to ``inputLineReady`` will process future keypresses to build the string
+  ## and determine if the string is ready to be used.
+  ##
+  ## By default, only Enter (on Windows/POSIX) will finish the string entry (or
+  ## Ctrl-Enter on Javascript.) However, if ``allowTabArrowExit`` is set to true
+  ## then Escape, Up, Down, and Tab will also finish the entry.
   var goodX = x
   userInputText = strDefault
   userInputExitKey = Key.None
@@ -1234,9 +1245,19 @@ proc startInputLine*(
   userInputColumn = goodX
   if strDefault.len > 0:
     tb.write(strDefault)
-  tb.displayFull()
+  tb.display()
 
 proc inputLineReady*(tb: var TerminalBuffer): bool =
+  ## This procedure both processes any incoming keys pressed (building the string),
+  ## but also returns a bool of true when the string is ready.
+  ##
+  ## When this value is true, any further processing is finished until ``startInputLine``
+  ## restarts the whole process from the beginning again.
+  ##
+  ## If you wish to get the string, call ``getInputLineText``.
+  ##
+  ## If you wish to get the Key that caused the the process to stop, call 
+  ## ``getInputLineExitKey``.
   if userInputExitKey != Key.None:
     result = true
     return
@@ -1273,10 +1294,9 @@ proc inputLineReady*(tb: var TerminalBuffer): bool =
   of Key.Backspace:
     if userInputText.len > 0:
       userInputText = userInputText[0 .. ^2]
-      tb.setCursorXPos(userInputColumn)
-      tb.write(userInputText & " ")
-      tb.setCursorXPos(userInputColumn)
-      tb.write(userInputText)
+      tb.setCursorXPos(userInputColumn + userInputText.len)
+      tb.write(" ")
+      tb.setCursorXPos(userInputColumn + userInputText.len)
   else:
     let r = key.toRunes
     if r.len > 0:
@@ -1285,7 +1305,85 @@ proc inputLineReady*(tb: var TerminalBuffer): bool =
         userInputText &= $r
 
 proc getInputLineText*(): string =
+  ## Get the current string being built (or finished being built) by the
+  ## ``inputLineReady`` procedure and started by the ``startInputLine`` procedure.
   result = userInputText
 
 proc getInputLineExitKey*(): Key =
+  ## Get the reason that the ``startInputLine`` / ``inputLineReady`` process
+  ## ended. If the process has not ended (or was never started), you will get a
+  ## value of Key.None.
   result = userInputExitKey
+
+
+template timerLoop*(msDelay: int, content: untyped): untyped =
+  ## Most *illwill* programs are run as an infinite loop.
+  ##
+  ## In the context of a binary executable, such as when your program is
+  ## compiled for Windows or POSIX (MacOS/Linux), then this is literally
+  ## a ``while true:`` loop with a sleep period between each loop such as:
+  ##
+  ## .. code-block::
+  ##
+  ##     while true:
+  ##       #
+  ##       # your stuff goes here
+  ##       #
+  ##       tb.display()
+  ##       sleep(20)
+  ##
+  ## But when compiling for Javascript, this does not work because Web Browsers
+  ## are event-driven. In fact, using an infinite loop would "lock up" the web page
+  ## and prevent it from ever displaying anything.
+  ##
+  ## So, to prevent that, this universal template has been written to handle
+  ## all four environments (Windows, MacOS, Linux, and Javascript).
+  ##
+  ## Simply use this template as a replacment for the ``while`` and ``sleep``
+  ## calls:
+  ##
+  ## .. code-block::
+  ##
+  ##     timerLoop(20):
+  ##       #
+  ##       # your stuff goes here
+  ##       #
+  ##       tb.display()
+  ##
+  ## Behind the scenes, the compiler target is detected and the correct loop
+  ## handling is invoked.
+  env_terminal.timerLoop(msDelay, content)
+
+
+proc illwillOnLoad*(domId: cstring, cols, rows: int) {.exportc.} =
+  ## When using *illwill* to make Javascript, this is the 
+  ## routine that starts treating the target PRE element as a terminal.
+  ##
+  ## At minimum, the HTML should have:
+  ##
+  ## .. code-block::
+  ##
+  ##     <html>
+  ##       <head>
+  ##         <script src="mycode.js"></script>
+  ##       </head>
+  ##       <body onload="illwillOnLoad('terminal', 80, 24);">
+  ##         <pre id="terminal">
+  ##            initializing...
+  ##         </pre>
+  ##       </body>
+  ##     </html>
+  ##
+  ## Of note:
+  ##
+  ##  - the compiled javascript script (``mycode.js``) is loaded. It is safe to
+  ##    do this in the header.
+  ##  - this procedure is only called after the body of the page loads. The ``domId``
+  ##    is the *id* of the ``pre`` element. The column and row sizes are determined
+  ##    beforehand, regardless of the CSS/browser styling of the ``pre``.
+  ##  - this routine should be called from within the html as shown. It is NOT
+  ##    meant to be called more than once.
+  when defined(js):
+    env_terminal.illWillOnLoad(domId, cols, rows)
+  else:
+    discard

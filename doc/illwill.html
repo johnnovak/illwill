@@ -211,6 +211,8 @@ function main() {
     title="getInputLineText(): string"><wbr />get<wbr />Input<wbr />Line<wbr />Text<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#getInputLineExitKey"
     title="getInputLineExitKey(): Key"><wbr />get<wbr />Input<wbr />Line<wbr />Exit<wbr />Key<span class="attachedType"></span></a></li>
+  <li><a class="reference" href="#illwillOnLoad%2Ccstring%2Cint%2Cint"
+    title="illwillOnLoad(domId: cstring; cols, rows: int)"><wbr />illwill<wbr />On<wbr />Load<span class="attachedType"></span></a></li>
 
   </ul>
 </li>
@@ -245,6 +247,14 @@ function main() {
   <ul class="simple simple-toc-section">
       <li><a class="reference" href="#write.m%2CTerminalBuffer%2Cvarargs%5Btyped%5D"
     title="write(tb: var TerminalBuffer; args: varargs[typed]): untyped"><wbr />write<span class="attachedType"></span></a></li>
+
+  </ul>
+</li>
+<li>
+  <a class="reference reference-toplevel" href="#18" id="68">Templates</a>
+  <ul class="simple simple-toc-section">
+      <li><a class="reference" href="#timerLoop.t%2Cint%2Cuntyped"
+    title="timerLoop(msDelay: int; content: untyped): untyped"><wbr />timer<wbr />Loop<span class="attachedType"></span></a></li>
 
   </ul>
 </li>
@@ -873,9 +883,14 @@ Convenience method to draw a rectangle into a terminal buffer directly.
 <a id="startInputLine,TerminalBuffer,int,int,string,int"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#startInputLine%2CTerminalBuffer%2Cint%2Cint%2Cstring%2Cint"><span class="Identifier">startInputLine</span></a><span class="Other">(</span><span class="Identifier">tb</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="common.html#TerminalBuffer"><span class="Identifier">TerminalBuffer</span></a><span class="Other">;</span> <span class="Identifier">x</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">y</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">strDefault</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
                    <span class="Identifier">strLen</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">allowTabArrowExit</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
-    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">IllwillError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
+<p>Setup the terminal for gathering text from the terminal user.</p>
+<p>The <tt class="docutils literal"><span class="pre">strDefault</span></tt> value is displayed at the column (x) and row(y). The cursor is then moved to the end of that value and shown.</p>
+<p>If the column is too close the right edge fo the screen, then the length is adjusted to account for that.</p>
+<p>This procedure does NOT actually gather then number. Instead, future calls to <tt class="docutils literal"><span class="pre">inputLineReady</span></tt> will process future keypresses to build the string and determine if the string is ready to be used.</p>
+<p>By default, only Enter (on Windows/POSIX) will finish the string entry (or Ctrl-Enter on Javascript.) However, if <tt class="docutils literal"><span class="pre">allowTabArrowExit</span></tt> is set to true then Escape, Up, Down, and Tab will also finish the entry.</p>
 
 
 </dd>
@@ -884,6 +899,10 @@ Convenience method to draw a rectangle into a terminal buffer directly.
     <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IllwillError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
+<p>This procedure both processes any incoming keys pressed (building the string), but also returns a bool of true when the string is ready.</p>
+<p>When this value is true, any further processing is finished until <tt class="docutils literal"><span class="pre">startInputLine</span></tt> restarts the whole process from the beginning again.</p>
+<p>If you wish to get the string, call <tt class="docutils literal"><span class="pre">getInputLineText</span></tt>.</p>
+<p>If you wish to get the Key that caused the the process to stop, call <tt class="docutils literal"><span class="pre">getInputLineExitKey</span></tt>.</p>
 
 
 </dd>
@@ -891,13 +910,37 @@ Convenience method to draw a rectangle into a terminal buffer directly.
 <dt><pre><span class="Keyword">proc</span> <a href="#getInputLineText"><span class="Identifier">getInputLineText</span></a><span class="Other">(</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-
+Get the current string being built (or finished being built) by the <tt class="docutils literal"><span class="pre">inputLineReady</span></tt> procedure and started by the <tt class="docutils literal"><span class="pre">startInputLine</span></tt> procedure.
 
 </dd>
 <a id="getInputLineExitKey"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#getInputLineExitKey"><span class="Identifier">getInputLineExitKey</span></a><span class="Other">(</span><span class="Other">)</span><span class="Other">:</span> <a href="common.html#Key"><span class="Identifier">Key</span></a> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
+Get the reason that the <tt class="docutils literal"><span class="pre">startInputLine</span></tt> / <tt class="docutils literal"><span class="pre">inputLineReady</span></tt> process ended. If the process has not ended (or was never started), you will get a value of Key.None.
+
+</dd>
+<a id="illwillOnLoad,cstring,int,int"></a>
+<dt><pre><span class="Keyword">proc</span> <a href="#illwillOnLoad%2Ccstring%2Cint%2Cint"><span class="Identifier">illwillOnLoad</span></a><span class="Other">(</span><span class="Identifier">domId</span><span class="Other">:</span> <span class="Identifier">cstring</span><span class="Other">;</span> <span class="Identifier">cols</span><span class="Other">,</span> <span class="Identifier">rows</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">exportc</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dd>
+
+<p>When using <em>illwill</em> with for making Javascript, this is the routine that starts treating the PRE element as a terminal.</p>
+<p>At minimum, the HTML should have:</p>
+<pre class="listing"><span class="Operator">&lt;</span><span class="Identifier">html</span><span class="Operator">&gt;</span>
+  <span class="Operator">&lt;</span><span class="Identifier">head</span><span class="Operator">&gt;</span>
+    <span class="Operator">&lt;</span><span class="Identifier">script</span> <span class="Identifier">src</span><span class="Operator">=</span><span class="StringLit">&quot;mycode.js&quot;</span><span class="Operator">&gt;&lt;/</span><span class="Identifier">script</span><span class="Operator">&gt;</span>
+  <span class="Operator">&lt;/</span><span class="Identifier">head</span><span class="Operator">&gt;</span>
+  <span class="Operator">&lt;</span><span class="Identifier">body</span> <span class="Identifier">onload</span><span class="Operator">=</span><span class="StringLit">&quot;illwillOnLoad('terminal', 80, 24);&quot;</span><span class="Operator">&gt;</span>
+    <span class="Operator">&lt;</span><span class="Identifier">pre</span> <span class="Identifier">id</span><span class="Operator">=</span><span class="StringLit">&quot;terminal&quot;</span><span class="Operator">&gt;</span>
+       <span class="Identifier">initializing</span><span class="Operator">...</span>
+    <span class="Operator">&lt;/</span><span class="Identifier">pre</span><span class="Operator">&gt;</span>
+  <span class="Operator">&lt;/</span><span class="Identifier">body</span><span class="Operator">&gt;</span>
+<span class="Operator">&lt;/</span><span class="Identifier">html</span><span class="Operator">&gt;</span></pre><p>Of note:</p>
+<blockquote><p><ul class="simple"><li>the compiled javascript script (<tt class="docutils literal"><span class="pre">mycode.js</span></tt>) is loaded. It is safe to do this in the header.</li>
+<li>this procedure is only called after the body of the page loads. The <tt class="docutils literal"><span class="pre">domId</span></tt> is the <em>id</em> of the <tt class="docutils literal"><span class="pre">pre</span></tt> element. The column and row sizes are determined beforehand, regardless of the CSS/browser styling of the <tt class="docutils literal"><span class="pre">pre</span></tt>.</li>
+<li>this routine should be called from within the html as shown. It is NOT meant to be called more than once.</li>
+</ul>
+</p></blockquote>
 
 
 </dd>
@@ -1025,6 +1068,33 @@ Returns the height of the box buffer.
 </dd>
 
 </dl></div>
+<div class="section" id="18">
+<h1><a class="toc-backref" href="#18">Templates</a></h1>
+<dl class="item">
+<a id="timerLoop.t,int,untyped"></a>
+<dt><pre><span class="Keyword">template</span> <a href="#timerLoop.t%2Cint%2Cuntyped"><span class="Identifier">timerLoop</span></a><span class="Other">(</span><span class="Identifier">msDelay</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">content</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
+<dd>
+
+<p>Most <em>illwill</em> programs are run as an infinite loop.</p>
+<p>In the context of a binary executable, such as when your program is compiled for Windows or POSIX (MacOS/Linux), then this is literally a <tt class="docutils literal"><span class="pre">while true:</span></tt> loop with a sleep period between each loop such as:</p>
+<pre class="listing"><span class="Keyword">while</span> <span class="Identifier">true</span><span class="Punctuation">:</span>
+  <span class="Comment">#</span>
+  <span class="Comment"># your stuff goes here</span>
+  <span class="Comment">#</span>
+  <span class="Identifier">tb</span><span class="Operator">.</span><span class="Identifier">display</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+  <span class="Identifier">sleep</span><span class="Punctuation">(</span><span class="DecNumber">20</span><span class="Punctuation">)</span></pre><p>But when compiling for Javascript, this does not work because Web Browsers are event-driven. In fact, using an infinite loop would &quot;lock up&quot; the web page and prevent it from ever displaying anything.</p>
+<p>So, to prevent that, this universal template has been written to handle all four environments (Windows, MacOS, Linux, and Javascript).</p>
+<p>Simply use this template as a replacment for the <tt class="docutils literal"><span class="pre">while</span></tt> and <tt class="docutils literal"><span class="pre">sleep</span></tt> calls:</p>
+<pre class="listing"><span class="Identifier">timerLoop</span><span class="Punctuation">(</span><span class="DecNumber">20</span><span class="Punctuation">)</span><span class="Punctuation">:</span>
+  <span class="Comment">#</span>
+  <span class="Comment"># your stuff goes here</span>
+  <span class="Comment">#</span>
+  <span class="Identifier">tb</span><span class="Operator">.</span><span class="Identifier">display</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre><p>Behind the scenes, the compiler target is detected and the correct loop handling is invoked.</p>
+
+
+</dd>
+
+</dl></div>
 <div class="section" id="19">
 <h1><a class="toc-backref" href="#19">Exports</a></h1>
 <dl class="item">
@@ -1038,7 +1108,7 @@ Returns the height of the box buffer.
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br/>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2020-06-28 21:31:18 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2020-06-29 03:48:11 UTC</small>
       </div>
     </div>
   </div>

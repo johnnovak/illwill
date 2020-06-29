@@ -200,7 +200,7 @@ type
 
     Mouse = (5000, "Mouse")
 
-  IllwillError* = object of Exception
+  IllwillError* = object of IOError
 
 type
   MouseButtonAction* {.pure.} = enum
