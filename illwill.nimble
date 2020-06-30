@@ -33,4 +33,5 @@ task examplesDebug, "Compiles the examples (debug mode)":
 
 task docgen, "Generate HTML documentation":
   exec "nim doc --d:docgenonly -o:doc/illwill.html illwill.nim"
+  exec "nim doc --d:docgenonly -o:doc/common.html common.nim"
 

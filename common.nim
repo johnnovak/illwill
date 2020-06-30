@@ -1,7 +1,8 @@
 import unicode
 
 type
-  ForegroundColor* = enum   ## Foreground colors
+  ForegroundColor* = enum
+    ## Foreground colors
     fgNone = 0,             ## default
     fgBlack = 30,           ## black
     fgRed,                  ## red
@@ -12,7 +13,8 @@ type
     fgCyan,                 ## cyan
     fgWhite                 ## white
 
-  BackgroundColor* = enum   ## Background colors
+  BackgroundColor* = enum
+    ## Background colors
     bgNone = 0,             ## default (transparent)
     bgBlack = 40,           ## black
     bgRed,                  ## red
@@ -24,6 +26,7 @@ type
     bgWhite                 ## white
 
   Style* = enum
+    ## Style of text
     styleBright = 1,        ## bright text
     styleDim,               ## dim text
     styleItalic,            ## italic (or reverse on terminals not supporting)
@@ -34,7 +37,8 @@ type
     styleHidden,            ## hidden text
     styleStrikethrough      ## strikethrough
 
-  Key* {.pure.} = enum      ## Supported single key presses and key combinations
+  Key* {.pure.} = enum      
+    ## Supported single key presses and key combinations
     None = (-1, "None"),
 
     # Special ASCII characters
@@ -201,23 +205,28 @@ type
     Mouse = (5000, "Mouse")
 
   IllwillError* = object of IOError
+    ## The type of error thrown by *illwill* library.
 
 type
   MouseButtonAction* {.pure.} = enum
+    ## The state of the mouse button.
     mbaNone, mbaPressed, mbaReleased
   MouseInfo* = object
-    x*: int ## x mouse position
-    y*: int ## y mouse position
-    button*: MouseButton ## which button was pressed
+    ## Information about the mouse state.
+    x*: int                    ## x (column) mouse position
+    y*: int                    ## y (row) mouse position
+    button*: MouseButton       ## which button was pressed
     action*: MouseButtonAction ## if button was released or pressed
-    ctrl*: bool ## was ctrl was down on event
-    shift*: bool ## was shift was down on event
-    scroll*: bool ## if this is a mouse scroll
+    ctrl*: bool                ## was the ctrl key down on event?
+    shift*: bool               ## was the shift key down on event?
+    scroll*: bool              ## was this a mouse scrollwheel move?
     scrollDir*: ScrollDirection
-    move*: bool ## if this a mouse move
+    move*: bool                ## was this a XY mouse move?
   MouseButton* {.pure.} = enum
+    ## The identity of the mouse button.
     mbNone, mbLeft, mbMiddle, mbRight
   ScrollDirection* {.pure.} = enum
+    ## The direction of the mouse scrollwheel movement.
     sdNone, sdUp, sdDown
 
 type
@@ -306,12 +315,19 @@ proc `[]`*(tb: TerminalBuffer, x, y: Natural): TerminalChar =
     result = tb.buf[tb.width * y + x]
 
 func toKey*(c: int): Key =
+  ## Returns the Key that is associated with the ``c`` integer. See the ``Key`` type
+  ## definition for that list.
+  ##
+  ## If no Key is found, then Key.None is returned.
   try:
     result = Key(c)
   except RangeError:  # ignore unknown keycodes
     result = Key.None
 
 func toRunes*(k: Key): seq[Rune] {.used.} =
+  ## If the Key ``k`` has an associated printable character, then this returns
+  ## the unicode as a sequence of Runes. If none is found then an empty list
+  ## is returned.
   case k:
   of Space:
     result=" ".toRunes
