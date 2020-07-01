@@ -426,7 +426,7 @@ proc displayFull(tb: TerminalBuffer) =
           setAttribs(c)
         buf &= $c.ch
       flushBuf()
-
+    setPos(tb.currX, tb.currY)
 
 proc displayDiff(tb: TerminalBuffer) =
   when defined(js):
@@ -466,6 +466,7 @@ proc displayDiff(tb: TerminalBuffer) =
           flushBuf()
           bufXPos = x+1
       flushBuf()
+    setPos(tb.currX, tb.currY)
 
 
 var gDoubleBufferingEnabled = true
@@ -487,7 +488,7 @@ proc display*(tb: TerminalBuffer) =
   ##
   ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
-  if not gFullRedrawNextFrame and gDoubleBufferingEnabled:
+  if (not gFullRedrawNextFrame) and gDoubleBufferingEnabled:
     if gPrevTerminalBuffer == nil:
       displayFull(tb)
       gPrevTerminalBuffer = newTerminalBufferFrom(tb)
@@ -506,7 +507,6 @@ proc display*(tb: TerminalBuffer) =
     when not defined(js):
       flushFile(stdout)
     gFullRedrawNextFrame = false
-  setCursorPos(tb.currX, tb.currY) # critical for an up-to-date visual cursor
 
 type BoxChar = int
 
@@ -899,9 +899,11 @@ proc drawRect*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural,
 
 var
   userInputText = ""
+  userInputActive = false
   userInputExitKey = Key.None
   userInputMaxLen = 1
   userInputColumn = 0
+  userInputRow = 0
   userInputAllowTabArrow = false
 
 proc startInputLine*(
@@ -945,9 +947,10 @@ proc startInputLine*(
   tb.setCursorPos(goodX, y)
   showCursor()
   userInputColumn = goodX
+  userInputRow = y
   if strDefault.len > 0:
     tb.write(strDefault)
-  tb.display()
+  userInputActive = true
 
 proc inputLineReady*(tb: var TerminalBuffer): bool =
   ## This procedure both processes any incoming keys pressed (building the string),
@@ -960,11 +963,12 @@ proc inputLineReady*(tb: var TerminalBuffer): bool =
   ##
   ## If you wish to get the Key that caused the the process to stop, call 
   ## ``getInputLineExitKey``.
-  if userInputExitKey != Key.None:
+  if not userInputActive:
     result = true
     return
   result = false
 
+  var changeMade = false
   let key = getKey()
   case key
   of Key.None:
@@ -972,39 +976,52 @@ proc inputLineReady*(tb: var TerminalBuffer): bool =
   of Key.Enter:
     result = true
     userInputExitKey = key
-    hideCursor()
+    userInputActive = false
+    changeMade = true
   of Key.Tab:
     if userInputAllowTabArrow:
       result = true
       userInputExitKey = key
-      hideCursor()
+      userInputActive = false
+      changeMade = true
   of Key.Up:
     if userInputAllowTabArrow:
       result = true
       userInputExitKey = key
-      hideCursor()
+      userInputActive = false
+      changeMade = true
   of Key.Down:
     if userInputAllowTabArrow:
       result = true
       userInputExitKey = key
-      hideCursor()
+      userInputActive = false
+      changeMade = true
   of Key.Escape:
     if userInputAllowTabArrow:
       result = true
       userInputExitKey = key
-      hideCursor()
+      userInputActive = false
+      changeMade = true
   of Key.Backspace:
     if userInputText.len > 0:
       userInputText = userInputText[0 .. ^2]
       tb.setCursorXPos(userInputColumn + userInputText.len)
       tb.write(" ")
-      tb.setCursorXPos(userInputColumn + userInputText.len)
+      changeMade = true
   else:
     let r = key.toRunes
     if r.len > 0:
       if userInputText.len < userInputMaxLen:
         tb.write($r)
         userInputText &= $r
+        changeMade = true
+  #
+  if userInputActive:
+    tb.setCursorPos(userInputColumn + userInputText.len, userInputRow)
+  else:
+    hideCursor()
+  if changeMade:
+    tb.display()
 
 proc getInputLineText*(): string =
   ## Get the current string being built (or finished being built) by the
@@ -1073,7 +1090,7 @@ template timerLoop*(msDelay: int, content: untyped): untyped =
   env_terminal.timerLoop(msDelay, content)
 
 
-proc illwillOnLoad*(domId: cstring, cols, rows: int) {.exportc.} =
+proc illwillOnLoad*(domId: cstring, cols, rows: int) =
   ## When using *illwill* to make Javascript, this is the 
   ## routine that starts treating the target PRE element as a terminal.
   ##

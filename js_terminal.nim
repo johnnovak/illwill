@@ -108,11 +108,11 @@ proc envSetStyle*(style: set[common.Style]) =
 
 
 proc terminalWidth*(): int =
-  result = preTagColumnSize - 1
+  result = preTagColumnSize
 
 
 proc terminalHeight*(): int =
-  result = preTagRowSize - 1
+  result = preTagRowSize
 
 
 proc terminalSize*(): tuple[w, h: int] =
@@ -228,7 +228,7 @@ proc genRowHtml(tb: TerminalBuffer, row: int): string =
 
 proc applyTbToPre(tb: TerminalBuffer) =
   if preTag.isNil:
-    echo "not loaded yet"
+    # echo "(attp) not loaded yet"
     return
   setCursorPos(tb.currX, tb.currY)
   var newHtml = ""
@@ -319,7 +319,7 @@ proc consoleDeInit*() =
     onkeydown
   )
   if preTag.isNil:
-    echo "not loaded yet"
+    echo "cdi not loaded yet"
     return
   preTag.disabled = true
 
