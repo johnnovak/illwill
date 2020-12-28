@@ -400,9 +400,12 @@ when defined(windows):
       if getConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), gOldConsoleMode.addr) != 0:
         var mode = gOldConsoleMode and (not ENABLE_WRAP_AT_EOL_OUTPUT)
         discard setConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), mode)
+    else:
+      discard getConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), gOldConsoleMode.addr)
 
   proc consoleDeinit() =
-    discard setConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), gOldConsoleMode)
+    if gOldConsoleMode != 0:
+      discard setConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), gOldConsoleMode)
 
 
   func getKeyAsync(): Key =
