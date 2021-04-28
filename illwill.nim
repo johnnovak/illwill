@@ -1106,10 +1106,10 @@ proc write*(tb: var TerminalBuffer, s: string) =
   write(tb, tb.currX, tb.currY, s)
 
 var
-  gPrevTerminalBuffer: TerminalBuffer
-  gCurrBg: BackgroundColor
-  gCurrFg: ForegroundColor
-  gCurrStyle: set[Style]
+  gPrevTerminalBuffer {.threadvar.}: TerminalBuffer
+  gCurrBg {.threadvar.}: BackgroundColor
+  gCurrFg {.threadvar.}: ForegroundColor
+  gCurrStyle {.threadvar.}: set[Style]
 
 proc setAttribs(c: TerminalChar) =
   if c.bg == bgNone or c.fg == fgNone or c.style == {}:
@@ -1246,7 +1246,7 @@ const
   HORIZ = LEFT or RIGHT
   VERT  = UP or DOWN
 
-var gBoxCharsUnicode: array[64, string]
+var gBoxCharsUnicode {.threadvar.}: array[64, string]
 
 gBoxCharsUnicode[0] = " "
 
