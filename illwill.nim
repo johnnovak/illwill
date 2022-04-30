@@ -557,9 +557,9 @@ else:  # OS X & Linux
   const KeySequenceMaxLen = 100
 
   # global keycode buffer
-  var keyBuf: array[KeySequenceMaxLen, int]
+  var keyBuf {.threadvar.}: array[KeySequenceMaxLen, int]
 
-  let
+  const
     keySequences = {
       ord(Key.Up):        @["\eOA", "\e[A"],
       ord(Key.Down):      @["\eOB", "\e[B"],
