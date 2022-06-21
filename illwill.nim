@@ -499,6 +499,7 @@ else:  # OS X & Linux
     # XXX why don't the below 3 lines seem to have any effect?
     resetAttributes()
     showCursor()
+    stdout.write("\n")
     consoleDeinit()
     discard posix.raise(SIGTSTP)
 
