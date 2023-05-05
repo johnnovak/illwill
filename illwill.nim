@@ -230,7 +230,7 @@ type
 
     Mouse = (5000, "Mouse")
 
-  IllwillError* = object of Exception
+  IllwillError* = object of Defect
 
 type
   MouseButtonAction* {.pure.} = enum
@@ -285,7 +285,7 @@ proc getMouse*(): MouseInfo =
 func toKey(c: int): Key =
   try:
     result = Key(c)
-  except RangeError:  # ignore unknown keycodes
+  except RangeDefect:  # ignore unknown keycodes
     result = Key.None
 
 var gIllwillInitialised = false
@@ -293,7 +293,7 @@ var gFullScreen = false
 var gFullRedrawNextFrame = false
 
 when defined(windows):
-  import encodings, unicode, winlean
+  import encodings, winlean
 
   proc kbhit(): cint {.importc: "_kbhit", header: "<conio.h>".}
   proc getch(): cint {.importc: "_getch", header: "<conio.h>".}
