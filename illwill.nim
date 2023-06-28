@@ -924,6 +924,24 @@ type
     currX: Natural
     currY: Natural
 
+#MW moved BoxBuffer here.. introduce some new types
+# : Buffer, Char
+type BoxChar = int
+
+type BoxBuffer* = ref object
+  ## Box buffers are used to store the results of multiple consecutive box
+  ## drawing calls. The idea is that when you draw a series of lines and
+  ## rectangles into the buffer, the overlapping lines will get automatically
+  ## connected by placing the appropriate UTF-8 symbols at the corner and
+  ## junction points. The results can then be written to a terminal buffer.
+  width: Natural
+  height: Natural
+  buf: seq[BoxChar]
+
+type Buffer* = TerminalBuffer | BoxBuffer
+type Char* = TerminalChar | BoxChar
+#MW
+
 proc `[]=`*(tb: var TerminalBuffer, x, y: Natural, ch: TerminalChar) =
   ## Index operator to write a character into the terminal buffer at the
   ## specified location. Does nothing if the location is outside of the
@@ -976,18 +994,20 @@ proc newTerminalBuffer*(width, height: Natural): TerminalBuffer =
   tb.clear()
   result = tb
 
-func width*(tb: TerminalBuffer): Natural =
+#MW same width and height for TerminalBuffer & BoxBuffer
+func width*(buf: Buffer): Natural =
   ## Returns the width of the terminal buffer.
-  result = tb.width
+  result = buf.width
 
-func height*(tb: TerminalBuffer): Natural =
+func height*(buf: Buffer): Natural =
   ## Returns the height of the terminal buffer.
-  result = tb.height
+  result = buf.height
+#MW
 
-
-proc copyFrom*(tb: var TerminalBuffer,
-               src: TerminalBuffer, srcX, srcY, width, height: Natural,
-               destX, destY: Natural) =
+#MW same copyFrom for TerminalBuffer and BoxBuffer
+proc copyFrom*(dest: var Buffer,
+               src: Buffer, srcX, srcY, width, height: int,
+               destX, destY: int) =
   ## Copies the contents of the `src` terminal buffer into this one.
   ## A rectangular area of dimension `width` and `height` is copied from
   ## the position `srcX` and `srcY` in the source buffer to the position
@@ -1000,22 +1020,48 @@ proc copyFrom*(tb: var TerminalBuffer,
   let
     srcWidth = max(src.width - srcX, 0)
     srcHeight = max(src.height - srcY, 0)
-    destWidth = max(tb.width - destX, 0)
-    destHeight = max(tb.height - destY, 0)
+    destWidth = max(dest.width - destX, 0)
+    destHeight = max(dest.height - destY, 0)
     w = min(min(srcWidth, destWidth), width)
     h = min(min(srcHeight, destHeight), height)
 
   for yOffs in 0..<h:
     for xOffs in 0..<w:
-      tb[xOffs + destX, yOffs + destY] = src[xOffs + srcX, yOffs + srcY]
+      dest[xOffs + destX, yOffs + destY] = src[xOffs + srcX, yOffs + srcY]
 
 
-proc copyFrom*(tb: var TerminalBuffer, src: TerminalBuffer) =
+proc copyFrom*(dest: var Buffer, src: Buffer) =
   ## Copies the full contents of the `src` terminal buffer into this one.
   ##
   ## If the extents of the source buffer is greater than the extents of the
   ## destination buffer, the copied area is clipped to the destination area.
-  tb.copyFrom(src, 0, 0, src.width, src.height, 0, 0)
+  dest.copyFrom(src, 0, 0, src.width, src.height, 0, 0)
+
+#MW check for Rune.Whitespace in TerminalBuffer and Space in BoxBuffer
+proc checkChar(c: Char): bool =
+  if c is TerminalChar: return not c.ch.isWhiteSpace
+  else: return (cast[BoxChar](c) != Space.int)
+
+#MW Same as copyFrom but only copies to "transparent" (Whitespace or Space)
+proc copyFromTrans*(dest: var Buffer,
+               src: Buffer, srcX, srcY, width, height: int,
+               destX, destY: int) =
+  let
+    srcWidth = max(src.width - srcX, 0)
+    srcHeight = max(src.height - srcY, 0)
+    destWidth = max(dest.width - destX, 0)
+    destHeight = max(dest.height - destY, 0)
+    w = min(min(srcWidth, destWidth), width)
+    h = min(min(srcHeight, destHeight), height)
+
+  for yOffs in 0..<h:
+    for xOffs in 0..<w:
+      if checkChar(src[xOffs + srcX, yOffs + srcY]):
+        dest[xOffs + destX, yOffs + destY] = src[xOffs + srcX, yOffs + srcY]
+
+proc copyFromTrans*(dest: var Buffer, src: Buffer) =
+  dest.copyFromTrans(src, 0, 0, src.width, src.height, 0, 0)
+#MW
 
 proc newTerminalBufferFrom*(src: TerminalBuffer): TerminalBuffer =
   ## Creates a new terminal buffer with the dimensions of the `src` buffer and
@@ -1233,7 +1279,6 @@ proc display*(tb: TerminalBuffer) =
     flushFile(stdout)
     gFullRedrawNextFrame = false
 
-type BoxChar = int
 
 const
   LEFT   = 0x01
@@ -1320,30 +1365,12 @@ gBoxCharsUnicode[H_DBL or V_DBL or DOWN or UP or RIGHT or LEFT] = "╬"
 
 proc toUTF8String(c: BoxChar): string = gBoxCharsUnicode[c]
 
-type BoxBuffer* = ref object
-  ## Box buffers are used to store the results of multiple consecutive box
-  ## drawing calls. The idea is that when you draw a series of lines and
-  ## rectangles into the buffer, the overlapping lines will get automatically
-  ## connected by placing the appropriate UTF-8 symbols at the corner and
-  ## junction points. The results can then be written to a terminal buffer.
-  width: Natural
-  height: Natural
-  buf: seq[BoxChar]
-
 proc newBoxBuffer*(width, height: Natural): BoxBuffer =
   ## Creates a new box buffer of a fixed `width` and `height`.
   result = new BoxBuffer
   result.width = width
   result.height = height
   newSeq(result.buf, width * height)
-
-func width*(bb: BoxBuffer): Natural =
-  ## Returns the width of the box buffer.
-  result = bb.width
-
-func height*(bb: BoxBuffer): Natural =
-  ## Returns the height of the box buffer.
-  result = bb.height
 
 proc `[]=`(bb: var BoxBuffer, x, y: Natural, c: BoxChar) =
   if x < bb.width and y < bb.height:
@@ -1352,38 +1379,6 @@ proc `[]=`(bb: var BoxBuffer, x, y: Natural, c: BoxChar) =
 func `[]`(bb: BoxBuffer, x, y: Natural): BoxChar =
   if x < bb.width and y < bb.height:
     result = bb.buf[bb.width * y + x]
-
-proc copyFrom*(bb: var BoxBuffer,
-               src: BoxBuffer, srcX, srcY, width, height: Natural,
-               destX, destY: Natural) =
-  ## Copies the contents of the `src` box buffer into this one.
-  ## A rectangular area of dimension `width` and `height` is copied from
-  ## the position `srcX` and `srcY` in the source buffer to the position
-  ## `destX` and `destY` in this buffer.
-  ##
-  ## If the extents of the area to be copied lie outside the extents of the
-  ## buffers, the copied area will be clipped to the available area (in other
-  ## words, the call can never fail; in the worst case it just copies
-  ## nothing).
-  let
-    srcWidth = max(src.width - srcX, 0)
-    srcHeight = max(src.height - srcY, 0)
-    destWidth = max(bb.width - destX, 0)
-    destHeight = max(bb.height - destY, 0)
-    w = min(min(srcWidth, destWidth), width)
-    h = min(min(srcHeight, destHeight), height)
-
-  for yOffs in 0..<h:
-    for xOffs in 0..<w:
-      bb[xOffs + destX, yOffs + destY] = src[xOffs + srcX, yOffs + srcY]
-
-
-proc copyFrom*(bb: var BoxBuffer, src: BoxBuffer) =
-  ## Copies the full contents of the `src` box buffer into this one.
-  ##
-  ## If the extents of the source buffer is greater than the extents of the
-  ## destination buffer, the copied area is clipped to the destination area.
-  bb.copyFrom(src, 0, 0, src.width, src.height, 0, 0)
 
 proc newBoxBufferFrom*(src: BoxBuffer): BoxBuffer =
   ## Creates a new box buffer with the dimensions of the `src` buffer and
