@@ -230,7 +230,7 @@ type
 
     Mouse = (5000, "Mouse")
 
-  IllwillError* = object of Exception
+  IllwillError* = object of CatchableError
 
 type
   MouseButtonAction* {.pure.} = enum
@@ -282,18 +282,24 @@ proc getMouse*(): MouseInfo =
 
   return gMouseInfo
 
+
+{.push warning[HoleEnumConv]:off.}
+
 func toKey(c: int): Key =
   try:
     result = Key(c)
-  except RangeError:  # ignore unknown keycodes
+  except RangeDefect:  # ignore unknown keycodes
     result = Key.None
+
+{.pop}
+
 
 var gIllwillInitialised = false
 var gFullScreen = false
 var gFullRedrawNextFrame = false
 
 when defined(windows):
-  import encodings, unicode, winlean
+  import encodings, winlean
 
   proc kbhit(): cint {.importc: "_kbhit", header: "<conio.h>".}
   proc getch(): cint {.importc: "_getch", header: "<conio.h>".}
@@ -987,11 +993,13 @@ func height*(tb: TerminalBuffer): Natural =
 
 proc copyFrom*(tb: var TerminalBuffer,
                src: TerminalBuffer, srcX, srcY, width, height: Natural,
-               destX, destY: Natural) =
+               destX, destY: Natural; transparency=false) =
   ## Copies the contents of the `src` terminal buffer into this one.
   ## A rectangular area of dimension `width` and `height` is copied from
   ## the position `srcX` and `srcY` in the source buffer to the position
   ## `destX` and `destY` in this buffer.
+  ## Optional parameter is 'transparency = true', which will only copy
+  ## visible (not white-space) content to target-buffer.
   ##
   ## If the extents of the area to be copied lie outside the extents of the
   ## buffers, the copied area will be clipped to the available area (in other
@@ -1007,15 +1015,18 @@ proc copyFrom*(tb: var TerminalBuffer,
 
   for yOffs in 0..<h:
     for xOffs in 0..<w:
-      tb[xOffs + destX, yOffs + destY] = src[xOffs + srcX, yOffs + srcY]
+      if transparency:
+        if not src[xOffs + srcX, yOffs + srcY].ch.isWhiteSpace:
+          tb[xOffs + destX, yOffs + destY] = src[xOffs + srcX, yOffs + srcY]
+      else: tb[xOffs + destX, yOffs + destY] = src[xOffs + srcX, yOffs + srcY]
 
 
-proc copyFrom*(tb: var TerminalBuffer, src: TerminalBuffer) =
+proc copyFrom*(tb: var TerminalBuffer, src: TerminalBuffer, transparency=false) =
   ## Copies the full contents of the `src` terminal buffer into this one.
   ##
   ## If the extents of the source buffer is greater than the extents of the
   ## destination buffer, the copied area is clipped to the destination area.
-  tb.copyFrom(src, 0, 0, src.width, src.height, 0, 0)
+  tb.copyFrom(src, 0, 0, src.width, src.height, 0, 0, transparency)
 
 proc newTerminalBufferFrom*(src: TerminalBuffer): TerminalBuffer =
   ## Creates a new terminal buffer with the dimensions of the `src` buffer and
