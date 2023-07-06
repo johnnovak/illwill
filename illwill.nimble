@@ -9,7 +9,7 @@ skipDirs = @["doc", "examples", "img"]
 
 # Dependencies
 
-requires "nim >= 0.20.0"
+requires "nim >= 1.6.12"
 
 task examples, "Compiles the examples":
   exec "nim c -d:release examples/boxdrawing.nim"
