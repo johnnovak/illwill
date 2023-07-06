@@ -20,6 +20,7 @@ task examples, "Compiles the examples":
   exec "nim c -d:release examples/simplekeycodes.nim"
   exec "nim c -d:release examples/mouse.nim"
   exec "nim c -d:release examples/mouseMinimal.nim"
+  exec "nim c -d:release examples/transparency.nim"
 
 task examplesDebug, "Compiles the examples (debug mode)":
   exec "nim c examples/boxdrawing.nim"
@@ -29,7 +30,7 @@ task examplesDebug, "Compiles the examples (debug mode)":
   exec "nim c examples/readmeexample.nim"
   exec "nim c examples/simplekeycodes.nim"
   exec "nim c examples/mouse.nim"
-  exec "nim c examples/mouseMinimal.nim"
+  exec "nim c examples/transparency.nim"
 
 task docgen, "Generate HTML documentation":
   exec "nim doc -o:doc/illwill.html illwill"
