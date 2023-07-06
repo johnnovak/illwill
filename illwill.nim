@@ -531,7 +531,7 @@ else:  # OS X & Linux
       ttyState.c_lflag = ttyState.c_lflag and not Cflag(ICANON or ECHO)
 
       # minimum of number input read
-      ttyState.c_cc[VMIN] = 0.cuchar
+      ttyState.c_cc[VMIN] = 0.char
 
     else:
       # turn on canonical mode & echo
