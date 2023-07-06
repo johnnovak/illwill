@@ -764,8 +764,8 @@ proc illwillInit*(fullScreen: bool=true, mouse: bool=false) =
   ## Initializes the terminal and enables non-blocking keyboard input. Needs
   ## to be called before doing anything with the library.
   ##
-  ## If `mouse` is set to true, mouse events are captured and can be retrieved
-  ## with `getMouse()`.
+  ## If `mouse` is set to `true`, mouse events are captured and can be
+  ## retrieved with `getMouse()`.
   ##
   ## If the module is already intialised, `IllwillError` is raised.
   if gIllwillInitialised:
@@ -1030,7 +1030,7 @@ proc copyFrom*(tb: var TerminalBuffer,
   ## words, the call can never fail; in the worst case it just copies
   ## nothing).
   ##
-  ## If `transparency` is true, white-space characters in the source buffer
+  ## If `transparency` is `true`, white-space characters in the source buffer
   ## will not overwrite the contents of the target buffer (they're treated as
   ## transparent).
   let
@@ -1054,7 +1054,7 @@ proc copyFrom*(tb: var TerminalBuffer, src: TerminalBuffer, transparency=false) 
   ## If the extents of the source buffer is greater than the extents of the
   ## destination buffer, the copied area is clipped to the destination area.
   ##
-  ## If `transparency` is true, white-space characters in the source buffer
+  ## If `transparency` is `true`, white-space characters in the source buffer
   ## will not overwrite the contents of the target buffer (they're treated as
   ## transparent).
   tb.copyFrom(src, 0, 0, src.width, src.height, 0, 0, transparency)
@@ -1073,11 +1073,11 @@ proc setCursorPos*(tb: var TerminalBuffer, x, y: Natural) =
   tb.currY = y
 
 proc setCursorXPos*(tb: var TerminalBuffer, x: Natural) =
-  ## Sets the current x cursor position.
+  ## Sets the current X cursor position.
   tb.currX = x
 
 proc setCursorYPos*(tb: var TerminalBuffer, y: Natural) =
-  ## Sets the current y cursor position.
+  ## Sets the current Y cursor position.
   tb.currY = y
 
 proc setBackgroundColor*(tb: var TerminalBuffer, bg: BackgroundColor) =
@@ -1102,11 +1102,11 @@ func getCursorPos*(tb: TerminalBuffer): tuple[x: Natural, y: Natural] =
   result = (tb.currX, tb.currY)
 
 func getCursorXPos*(tb: TerminalBuffer): Natural =
-  ## Returns the current x cursor position.
+  ## Returns the current X cursor position.
   result = tb.currX
 
 func getCursorYPos*(tb: TerminalBuffer): Natural =
-  ## Returns the current y cursor position.
+  ## Returns the current Y cursor position.
   result = tb.currY
 
 func getBackgroundColor*(tb: var TerminalBuffer): BackgroundColor =
