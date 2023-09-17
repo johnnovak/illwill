@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.3.1"
+version       = "0.3.2"
 author        = "John Novak <john@johnnovak.net>"
 description   = "A curses inspired simple cross-platform console library for Nim"
 license       = "WTFPL"
@@ -9,7 +9,7 @@ skipDirs = @["doc", "examples", "img"]
 
 # Dependencies
 
-requires "nim >= 1.6.12"
+requires "nim >= 1.6.10"
 
 task examples, "Compiles the examples":
   exec "nim c -d:release examples/boxdrawing.nim"
