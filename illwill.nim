@@ -257,9 +257,6 @@ var
   gMouseInfo = MouseInfo()
   gMouse: bool = false
 
-template alias(newName: untyped, call: untyped) =
-  template newName(): untyped = call
-
 proc getMouse*(): MouseInfo =
   ## When the library is initialised with `illwillInit(mouse=true)`, mouse
   ## events are captured and can be retrieved by calling this function.
@@ -805,6 +802,10 @@ proc illwillDeinit*() =
   showCursor()
 
 when defined(windows):
+
+  template alias(newName: untyped, call: untyped) =
+    template newName(): untyped = call
+
   var gLastMouseInfo = MouseInfo()
 
   proc fillGlobalMouseInfo(inputRecord: INPUT_RECORD) =
