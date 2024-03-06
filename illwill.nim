@@ -658,38 +658,44 @@ else:  # OS X & Linux
     else:
       gMouseInfo.scrollDir = ScrollDirection.sdNone
 
-  proc parseKey(charsRead: int): Key =
+  proc parseKeys(charsRead: int): seq[Key] =
     # Inspired by
     # https://github.com/mcandre/charm/blob/master/lib/charm.c
-    var key = Key.None
     if charsRead == 1:
       let ch = keyBuf[0]
       case ch:
-      of   9: key = Key.Tab
-      of  10: key = Key.Enter
-      of  27: key = Key.Escape
-      of  32: key = Key.Space
-      of 127: key = Key.Backspace
+      of   9: result.add Key.Tab
+      of  10: result.add Key.Enter
+      of  27: result.add Key.Escape
+      of  32: result.add Key.Space
+      of 127: result.add Key.Backspace
       of 0, 29, 30, 31: discard   # these have no Windows equivalents so
                                   # we'll ignore them
       else:
-        key = toKey(ch)
+        result.add toKey(ch)
 
     elif charsRead > 3 and keyBuf[0] == 27 and keyBuf[1] == 91 and keyBuf[2] == 60: # TODO what are these :)
       fillGlobalMouseInfo(keyBuf)
-      return Key.Mouse
+      result.add Key.Mouse
 
     else:
       var inputSeq = ""
       for i in 0..<charsRead:
         inputSeq &= char(keyBuf[i])
-      for keyCode, sequences in keySequences.pairs:
-        for s in sequences:
-          if s == inputSeq:
-            key = toKey(keyCode)
-    result = key
+      var off = 0
+      while off < inputSeq.len:
+        block found:
+          for keyCode, sequences in keySequences.pairs:
+            for s in sequences:
+              if off + s.len <= inputSeq.len and s == inputSeq[off..off+s.high]:
+                result.add toKey(keyCode)
+                off += s.len
+                break found
+          if off < inputSeq.len:
+            result.add toKey(int(inputSeq[off]))
+            off += 1
 
-  proc getKeyAsync(): Key =
+  proc getKeysAsync(): seq[Key] =
     var i = 0
     while kbhit() > 0 and i < KeySequenceMaxLen:
       var ret = read(0, keyBuf[i].addr, 1)
@@ -697,10 +703,8 @@ else:  # OS X & Linux
         i += 1
       else:
         break
-    if i == 0:  # nothing read
-      result = Key.None
-    else:
-      result = parseKey(i)
+    if i > 0:
+      result = parseKeys(i)
 
   template put(s: string) = stdout.write s
 
@@ -887,11 +891,29 @@ proc getKey*(): Key =
   ##
   ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
-  result = getKeyAsync()
+  let keys = getKeysAsync()
+  if keys.len == 0:
+    return Key.None
   when defined(windows):
     if result == Key.None:
       if hasMouseInput():
         return Key.Mouse
+
+proc getKeys*(): seq[Key] =
+  ## Reads the next keystroke in a non-blocking manner. If there are no
+  ## keypress events in the buffer, `Key.None` is returned.
+  ##
+  ## If a mouse event was captured, `Key.Mouse` is returned. Call `getMouse()`
+  ## to get tne details about the event.
+  ##
+  ## If the module is not intialised, `IllwillError` is raised.
+  checkInit()
+  result = getKeysAsync()
+  when defined(windows):
+    if result == Key.None:
+      if hasMouseInput():
+        return Key.Mouse
+
 
 type
   TerminalChar* = object
