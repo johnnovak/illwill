@@ -910,9 +910,9 @@ proc getKeys*(): seq[Key] =
   checkInit()
   result = getKeysAsync()
   when defined(windows):
-    if result == Key.None:
+    if result.len == 0:
       if hasMouseInput():
-        return Key.Mouse
+        result.add Key.Mouse
 
 
 type
