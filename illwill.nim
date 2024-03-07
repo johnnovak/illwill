@@ -664,19 +664,19 @@ else:  # OS X & Linux
     if charsRead == 1:
       let ch = keyBuf[0]
       case ch:
-      of   9: result.add Key.Tab
-      of  10: result.add Key.Enter
-      of  27: result.add Key.Escape
-      of  32: result.add Key.Space
-      of 127: result.add Key.Backspace
+      of   9: result.add(Key.Tab)
+      of  10: result.add(Key.Enter)
+      of  27: result.add(Key.Escape)
+      of  32: result.add(Key.Space)
+      of 127: result.add(Key.Backspace)
       of 0, 29, 30, 31: discard   # these have no Windows equivalents so
                                   # we'll ignore them
       else:
-        result.add toKey(ch)
+        result.add(toKey(ch))
 
     elif charsRead > 3 and keyBuf[0] == 27 and keyBuf[1] == 91 and keyBuf[2] == 60: # TODO what are these :)
       fillGlobalMouseInfo(keyBuf)
-      result.add Key.Mouse
+      result.add(Key.Mouse)
 
     else:
       var inputSeq = ""
@@ -688,11 +688,11 @@ else:  # OS X & Linux
           for keyCode, sequences in keySequences.pairs:
             for s in sequences:
               if off + s.len <= inputSeq.len and s == inputSeq[off..off+s.high]:
-                result.add toKey(keyCode)
+                result.add(toKey(keyCode))
                 off += s.len
                 break found
           if off < inputSeq.len:
-            result.add toKey(int(inputSeq[off]))
+            result.add(toKey(int(inputSeq[off])))
             off += 1
 
   proc getKeysAsync(): seq[Key] =
@@ -912,7 +912,7 @@ proc getKeys*(): seq[Key] =
   when defined(windows):
     if result.len == 0:
       if hasMouseInput():
-        result.add Key.Mouse
+        result.add(Key.Mouse)
 
 
 type
