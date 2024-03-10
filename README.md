@@ -49,6 +49,15 @@ player that uses illwill for its awesome text-mode user interface</em></p>
   style/approach.
 * You absolutely don't want any external dependencies.
 
+### Projects using illwill
+
+- [ttop](https://github.com/inv2004/ttop) — System monitoring tool with historical data service, triggers and top-like TUI
+- [promexplorer](https://github.com/marcusramberg/promexplorer) — A simple tool to explore Prometheus exporter metrics
+- [clipclap](https://github.com/tttardigrado/clipclap) — A terminal-based ClipBoard Manager written in Nim
+- [illwillWidgets](https://github.com/enthus1ast/illwillWidgets) — Mouse enabled widgets for illwill
+- [tui_widget](https://github.com/jaar23/tui_widget) — Terminal UI widgets based on illwill
+- [nimSnake](https://github.com/ColTrez/nimSnake) — Classic game of snake implemented in nim using the illwill TUI library for graphics
+
 ### Don't use it if
 
 * You need ultimate robustness in terms of supporting obscure terminals,
