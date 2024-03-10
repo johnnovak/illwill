@@ -51,6 +51,7 @@ player that uses illwill for its awesome text-mode user interface</em></p>
 
 ### Projects using illwill
 
+- [nim-mod](https://github.com/johnnovak/nim-mod) — A Nim MOD player just for fun 
 - [ttop](https://github.com/inv2004/ttop) — System monitoring tool with historical data service, triggers and top-like TUI
 - [promexplorer](https://github.com/marcusramberg/promexplorer) — A simple tool to explore Prometheus exporter metrics
 - [clipclap](https://github.com/tttardigrado/clipclap) — A terminal-based ClipBoard Manager written in Nim
