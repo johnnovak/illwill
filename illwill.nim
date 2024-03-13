@@ -291,7 +291,7 @@ proc getMouse*(): MouseInfo =
 
 {.push warning[HoleEnumConv]:off.}
 
-func toKey*(c: int): Key =
+func toKey(c: int): Key =
   try:
     result = Key(c)
   except RangeDefect:  # ignore unknown keycodes
@@ -505,6 +505,10 @@ else:  # OS X & Linux
     DISABLE = "l"
     MouseTrackAny = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{ENABLE}{CSI}?{SET_ANY_EVENT_MOUSE}{ENABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{ENABLE}"
     DisableMouseTrackAny = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{DISABLE}{CSI}?{SET_ANY_EVENT_MOUSE}{DISABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{DISABLE}"
+    KEYS_D = [Key.Up, Key.Down, Key.Right, Key.Left, Key.None, Key.End, Key.None, Key.Home]
+    KEYS_E = [Key.Delete, Key.End, Key.PageUp, Key.PageDown, Key.Home, Key.End]
+    KEYS_F = [Key.F1, Key.F2, Key.F3, Key.F4, Key.F5, Key.None, Key.F6, Key.F7, Key.F8]
+    KEYS_G = [Key.F9, Key.F10, Key.None, Key.F11, Key.F12]
 
   # Adapted from:
   # https://ftp.gnu.org/old-gnu/Manuals/glibc-2.2.3/html_chapter/libc_24.html#SEC499
@@ -688,11 +692,6 @@ else:  # OS X & Linux
           if s == inputSeq:
             key = toKey(keyCode)
     result = key
-
-  const KEYS_D = [Key.Up, Key.Down, Key.Right, Key.Left, Key.None, Key.End, Key.None, Key.Home]
-  const KEYS_E = [Key.Delete, Key.End, Key.PageUp, Key.PageDown, Key.Home, Key.End]
-  const KEYS_F = [Key.F1, Key.F2, Key.F3, Key.F4, Key.F5, Key.None, Key.F6, Key.F7, Key.F8]
-  const KEYS_G = [Key.F9, Key.F10, Key.None, Key.F11, Key.F12]
 
   proc parseStdin[T](input: T): Key =
     var ch1, ch2, ch3, ch4, ch5: char
