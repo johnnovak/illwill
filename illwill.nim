@@ -291,7 +291,7 @@ proc getMouse*(): MouseInfo =
 
 {.push warning[HoleEnumConv]:off.}
 
-func toKey(c: int): Key =
+func toKey*(c: int): Key =
   try:
     result = Key(c)
   except RangeDefect:  # ignore unknown keycodes
@@ -548,10 +548,10 @@ else:  # OS X & Linux
     # set the terminal attributes.
     discard tcSetAttr(STDIN_FILENO, TCSANOW, ttyState.addr)
 
-  proc kbhit(): cint =
+  proc kbhit(ms: int): cint =
     var tv: Timeval
-    tv.tv_sec = Time(0)
-    tv.tv_usec = 0
+    tv.tv_sec = Time(ms div 1000)
+    tv.tv_usec = 1000 * (ms mod 1000)
 
     var fds: TFdSet
     FD_ZERO(fds)
@@ -689,18 +689,53 @@ else:  # OS X & Linux
             key = toKey(keyCode)
     result = key
 
-  proc getKeyAsync(): Key =
-    var i = 0
-    while kbhit() > 0 and i < KeySequenceMaxLen:
-      var ret = read(0, keyBuf[i].addr, 1)
-      if ret > 0:
-        i += 1
+  const KEYS_D = [Key.Up, Key.Down, Key.Right, Key.Left, Key.None, Key.End, Key.None, Key.Home]
+  const KEYS_E = [Key.Delete, Key.End, Key.PageUp, Key.PageDown, Key.Home, Key.End]
+  const KEYS_F = [Key.F1, Key.F2, Key.F3, Key.F4, Key.F5, Key.None, Key.F6, Key.F7, Key.F8]
+  const KEYS_G = [Key.F9, Key.F10, Key.None, Key.F11, Key.F12]
+
+  proc parseStdin[T](input: T): Key =
+    var ch1, ch2, ch3, ch4, ch5: char
+    result = Key.None
+    if read(input, ch1.addr, 1) > 0:
+      if ch1 == '\e':
+        if read(input, ch2.addr, 1) > 0:
+          if ch2 == 'O' and read(input, ch3.addr, 1) > 0:
+            if ch3 in "ABCDFH":
+              result = KEYS_D[int(ch3) - int('A')]
+            elif ch3 in "PQRS":
+              result = KEYS_F[int(ch3) - int('P')]
+          elif ch2 == '[' and read(input, ch3.addr, 1) > 0:
+            if ch3 in "ABCDFH":
+              result = KEYS_D[int(ch3) - int('A')]
+            elif ch3 in "PQRS":
+              result = KEYS_F[int(ch3) - int('P')]
+            elif ch3 == '1' and read(input, ch4.addr, 1) > 0:
+              if ch4 == '~':
+                result = Key.Home
+              elif ch4 in "12345789" and read(input, ch5.addr, 1) > 0 and ch5 == '~':
+                result = KEYS_F[int(ch4) - int('1')]
+            elif ch3 == '2' and read(input, ch4.addr, 1) > 0:
+              if ch4 == '~':
+                result = Key.Insert
+              elif ch4 in "0134" and read(input, ch5.addr, 1) > 0 and ch5 == '~':
+                result = KEYS_G[int(ch4) - int('0')]
+            elif ch3 in "345678" and read(input, ch4.addr, 1) > 0 and ch4 == '~':
+              result = KEYS_E[int(ch3) - int('3')]
+            else:
+              discard   # if cannot parse full seq it is discard
+          else:
+            discard     # if cannot parse full seq it is discard
+        else:
+          result = Key.Escape
       else:
-        break
-    if i == 0:  # nothing read
-      result = Key.None
-    else:
-      result = parseKey(i)
+        result = Key(ch1)
+
+  proc getKeyAsync(ms: int): Key =
+    var i = 0
+    result = Key.None
+    if kbhit(ms) > 0:
+      result = parseStdin(cint(STDIN_FILENO))
 
   template put(s: string) = stdout.write s
 
@@ -887,7 +922,22 @@ proc getKey*(): Key =
   ##
   ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
-  result = getKeyAsync()
+  result = getKeyAsync(0)
+  when defined(windows):
+    if result == Key.None:
+      if hasMouseInput():
+        return Key.Mouse
+
+proc getKeyWithTimeout*(ms = 1000): Key =
+  ## Reads the next keystroke in a non-blocking manner. If there are no
+  ## keypress events in the buffer, `Key.None` is returned.
+  ##
+  ## If a mouse event was captured, `Key.Mouse` is returned. Call `getMouse()`
+  ## to get tne details about the event.
+  ##
+  ## If the module is not intialised, `IllwillError` is raised.
+  checkInit()
+  result = getKeyAsync(ms)
   when defined(windows):
     if result == Key.None:
       if hasMouseInput():
