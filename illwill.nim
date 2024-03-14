@@ -369,13 +369,13 @@ when defined(windows):
     FOCUS_EVENT_RECORD* {.bycopy.} = object
       bSetFocus*: BOOL
 
-    KEY_EVENT_RECORD* {.bycopy.} = object
-      bKeyDown*: BOOL
-      wRepeatCount*: WORD
-      wVirtualKeyCode*: WORD
-      wVirtualScanCode*: WORD
-      uChar*: KEY_EVENT_RECORD_UNION
-      dwControlKeyState*: DWORD
+    # KEY_EVENT_RECORD* {.bycopy.} = object
+    #   bKeyDown*: BOOL
+    #   wRepeatCount*: WORD
+    #   wVirtualKeyCode*: WORD
+    #   wVirtualScanCode*: WORD
+    #   uChar*: KEY_EVENT_RECORD_UNION
+    #   dwControlKeyState*: DWORD
 
     MENU_EVENT_RECORD* {.bycopy.} = object
       dwCommandId*: UINT
@@ -421,54 +421,60 @@ when defined(windows):
     if gOldConsoleMode != 0:
       discard setConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), gOldConsoleMode)
 
-
-  func getKeyAsync(): Key =
-    var key = Key.None
-
-    if kbhit() > 0:
-      let c = getch()
-      case c:
-      of   0:
-        case getch():
-        of 59: key = Key.F1
-        of 60: key = Key.F2
-        of 61: key = Key.F3
-        of 62: key = Key.F4
-        of 63: key = Key.F5
-        of 64: key = Key.F6
-        of 65: key = Key.F7
-        of 66: key = Key.F8
-        of 67: key = Key.F9
-        of 68: key = Key.F10
-        else: discard getch()  # ignore unknown 2-key keycodes
-
-      of   8: key = Key.Backspace
-      of   9: key = Key.Tab
-      of  13: key = Key.Enter
-      of  32: key = Key.Space
-
-      of 224:
-        case getch():
-        of  72: key = Key.Up
-        of  75: key = Key.Left
-        of  77: key = Key.Right
-        of  80: key = Key.Down
-
-        of  71: key = Key.Home
-        of  82: key = Key.Insert
-        of  83: key = Key.Delete
-        of  79: key = Key.End
-        of  73: key = Key.PageUp
-        of  81: key = Key.PageDown
-
-        of 133: key = Key.F11
-        of 134: key = Key.F12
-        else: discard  # ignore unknown 2-key keycodes
-
+  proc getchTimeout(ms: int32): KEY_EVENT_RECORD =
+    let fd = getStdHandle(STD_INPUT_HANDLE)
+    var keyEvent = KEY_EVENT_RECORD()
+    var numRead: cint
+    while true:
+      case waitForSingleObject(fd, ms)
+      of WAIT_TIMEOUT:
+        keyEvent.eventType = -1
+        return
+      of WAIT_OBJECT_0:
+        doAssert(readConsoleInput(fd, addr(keyEvent), 1, addr(numRead)) != 0)
+        if numRead == 0 or keyEvent.eventType != 1 or keyEvent.bKeyDown == 0:
+          continue
+        return keyEvent
       else:
-        key = toKey(c)
-    result = key
+        doAssert(false)
 
+  proc getKeyAsync(ms: int): Key =
+    let event = getchTimeout(int32(ms))
+
+    if event.eventType == -1:
+      return Key.None
+
+    if event.uChar != 0:
+      return toKey((event.uChar))
+    else:
+      case event.wVirtualScanCode
+      of  8: return Key.Backspace
+      of  9: return Key.Tab
+      of 13: return Key.Enter
+      of 32: return Key.Space
+      of 59: return Key.F1
+      of 60: return Key.F2
+      of 61: return Key.F3
+      of 62: return Key.F4
+      of 63: return Key.F5
+      of 64: return Key.F6
+      of 65: return Key.F7
+      of 66: return Key.F8
+      of 67: return Key.F9
+      of 68: return Key.F10
+      of 71: return Key.Home
+      of 72: return Key.Up
+      of 73: return Key.PageUp
+      of 75: return Key.Left
+      of 77: return Key.Right
+      of 79: return Key.End
+      of 80: return Key.Down
+      of 81: return Key.PageDown
+      of 82: return Key.Insert
+      of 83: return Key.Delete
+      of 87: return Key.F11
+      of 88: return Key.F12
+      else:  return Key.None
 
   proc writeConsole(hConsoleOutput: HANDLE, lpBuffer: pointer,
                     nNumberOfCharsToWrite: DWORD,
