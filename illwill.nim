@@ -307,9 +307,6 @@ var gFullRedrawNextFrame = false
 when defined(windows):
   import encodings, winlean
 
-  proc kbhit(): cint {.importc: "_kbhit", header: "<conio.h>".}
-  proc getch(): cint {.importc: "_getch", header: "<conio.h>".}
-
   proc getConsoleMode(hConsoleHandle: Handle, dwMode: ptr DWORD): WINBOOL {.
       stdcall, dynlib: "kernel32", importc: "GetConsoleMode".}
 
@@ -368,14 +365,6 @@ when defined(windows):
     PCOORD* = ptr COORD
     FOCUS_EVENT_RECORD* {.bycopy.} = object
       bSetFocus*: BOOL
-
-    # KEY_EVENT_RECORD* {.bycopy.} = object
-    #   bKeyDown*: BOOL
-    #   wRepeatCount*: WORD
-    #   wVirtualKeyCode*: WORD
-    #   wVirtualScanCode*: WORD
-    #   uChar*: KEY_EVENT_RECORD_UNION
-    #   dwControlKeyState*: DWORD
 
     MENU_EVENT_RECORD* {.bycopy.} = object
       dwCommandId*: UINT
