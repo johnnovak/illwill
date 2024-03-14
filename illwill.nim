@@ -893,7 +893,6 @@ proc getKeyWithTimeout*(ms = 1000): Key =
       if hasMouseInput():
         return Key.Mouse
 
-
 type
   TerminalChar* = object
     ## Represents a character in the terminal buffer, including color and
