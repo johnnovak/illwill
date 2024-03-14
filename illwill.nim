@@ -583,34 +583,6 @@ else:  # OS X & Linux
   # global keycode buffer
   var keyBuf {.threadvar.}: array[KeySequenceMaxLen, int]
 
-  const
-    keySequences = {
-      ord(Key.Up):        @["\eOA", "\e[A"],
-      ord(Key.Down):      @["\eOB", "\e[B"],
-      ord(Key.Right):     @["\eOC", "\e[C"],
-      ord(Key.Left):      @["\eOD", "\e[D"],
-
-      ord(Key.Home):      @["\e[1~", "\e[7~", "\eOH", "\e[H"],
-      ord(Key.Insert):    @["\e[2~"],
-      ord(Key.Delete):    @["\e[3~"],
-      ord(Key.End):       @["\e[4~", "\e[8~", "\eOF", "\e[F"],
-      ord(Key.PageUp):    @["\e[5~"],
-      ord(Key.PageDown):  @["\e[6~"],
-
-      ord(Key.F1):        @["\e[11~", "\eOP"],
-      ord(Key.F2):        @["\e[12~", "\eOQ"],
-      ord(Key.F3):        @["\e[13~", "\eOR"],
-      ord(Key.F4):        @["\e[14~", "\eOS"],
-      ord(Key.F5):        @["\e[15~"],
-      ord(Key.F6):        @["\e[17~"],
-      ord(Key.F7):        @["\e[18~"],
-      ord(Key.F8):        @["\e[19~"],
-      ord(Key.F9):        @["\e[20~"],
-      ord(Key.F10):       @["\e[21~"],
-      ord(Key.F11):       @["\e[23~"],
-      ord(Key.F12):       @["\e[24~"],
-    }.toTable
-
   proc splitInputs(inp: openarray[int], max: Natural): seq[seq[int]] =
     ## splits the input buffer to extract mouse coordinates
     var parts: seq[seq[int]] = @[]
@@ -668,42 +640,12 @@ else:  # OS X & Linux
     else:
       gMouseInfo.scrollDir = ScrollDirection.sdNone
 
-  proc parseKey(charsRead: int): Key =
-    # Inspired by
-    # https://github.com/mcandre/charm/blob/master/lib/charm.c
-    var key = Key.None
-    if charsRead == 1:
-      let ch = keyBuf[0]
-      case ch:
-      of   9: key = Key.Tab
-      of  10: key = Key.Enter
-      of  27: key = Key.Escape
-      of  32: key = Key.Space
-      of 127: key = Key.Backspace
-      of 0, 29, 30, 31: discard   # these have no Windows equivalents so
-                                  # we'll ignore them
-      else:
-        key = toKey(ch)
-
-    elif charsRead > 3 and keyBuf[0] == 27 and keyBuf[1] == 91 and keyBuf[2] == 60: # TODO what are these :)
-      fillGlobalMouseInfo(keyBuf)
-      return Key.Mouse
-
-    else:
-      var inputSeq = ""
-      for i in 0..<charsRead:
-        inputSeq &= char(keyBuf[i])
-      for keyCode, sequences in keySequences.pairs:
-        for s in sequences:
-          if s == inputSeq:
-            key = toKey(keyCode)
-    result = key
-
   proc parseStdin[T](input: T): Key =
     var ch1, ch2, ch3, ch4, ch5: char
     result = Key.None
     if read(input, ch1.addr, 1) > 0:
-      if ch1 == '\e':
+      case ch1
+      of '\e':
         if read(input, ch2.addr, 1) > 0:
           if ch2 == 'O' and read(input, ch3.addr, 1) > 0:
             if ch3 in "ABCDFH":
@@ -733,11 +675,14 @@ else:  # OS X & Linux
             discard     # if cannot parse full seq it is discard
         else:
           result = Key.Escape
+      of '\n':
+        result = Key.Enter
+      of '\b':
+        result = Key.Backspace
       else:
-        result = Key(ch1)
+        result = toKey(int(ch1))
 
   proc getKeyAsync(ms: int): Key =
-    var i = 0
     result = Key.None
     if kbhit(ms) > 0:
       result = parseStdin(cint(STDIN_FILENO))
