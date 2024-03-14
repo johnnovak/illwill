@@ -659,9 +659,9 @@ else:  # OS X & Linux
             elif ch3 in "345678" and read(input, ch4.addr, 1) > 0 and ch4 == '~':
               result = KEYS_E[int(ch3) - int('3')]
             else:
-              discard   # if cannot parse full seq it is discard
+              discard   # if cannot parse full seq it is discarded
           else:
-            discard     # if cannot parse full seq it is discard
+            discard     # if cannot parse full seq it is discarded
         else:
           result = Key.Escape
       of '\n':
