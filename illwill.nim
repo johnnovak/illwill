@@ -889,9 +889,9 @@ proc getKeyWithTimeout*(ms = 1000): Key =
   checkInit()
   result = getKeyAsync(ms)
   when defined(windows):
-    if result == Key.None:
+    if result.len == 0:
       if hasMouseInput():
-        return Key.Mouse
+        result.add Key.Mouse
 
 
 type
