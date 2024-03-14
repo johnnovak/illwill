@@ -879,8 +879,8 @@ proc getKey*(): Key =
         return Key.Mouse
 
 proc getKeyWithTimeout*(ms = 1000): Key =
-  ## Reads the next keystroke in a non-blocking manner. If there are no
-  ## keypress events in the buffer, `Key.None` is returned.
+  ## Reads the next keystroke with specific timeout (default = 1s). If there are no
+  ## keypress events happened in the `ms` perios, `Key.None` is returned.
   ##
   ## If a mouse event was captured, `Key.Mouse` is returned. Call `getMouse()`
   ## to get tne details about the event.
