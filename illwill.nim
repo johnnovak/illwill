@@ -550,7 +550,7 @@ else:  # OS X & Linux
   proc kbhit(ms: int): cint =
     var tv: Timeval
     tv.tv_sec = Time(ms div 1000)
-    tv.tv_usec = 1000 * (ms mod 1000)
+    tv.tv_usec = 1000 * (int32(ms) mod 1000) # int32 because of macos
 
     var fds: TFdSet
     FD_ZERO(fds)
