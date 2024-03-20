@@ -2,4 +2,4 @@ nimcache/
 *.swp
 *~
 .DS_Store
-doc
+doc/
