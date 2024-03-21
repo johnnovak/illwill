@@ -857,7 +857,7 @@ proc getKey*(): Key =
   ## keypress events in the buffer, `Key.None` is returned.
   ##
   ## If a mouse event was captured, `Key.Mouse` is returned. Call `getMouse()`
-  ## to get tne details about the event.
+  ## to get the details about the event.
   ##
   ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
@@ -868,11 +868,11 @@ proc getKey*(): Key =
         return Key.Mouse
 
 proc getKeyWithTimeout*(ms = 1000): Key =
-  ## Reads the next keystroke within specific timeout (default = 1s). If there are no
-  ## keypress events happen in the `ms` period, `Key.None` is returned.
+  ## Reads the next keystroke with a timeout. If there were no keypress events
+  ## in the specified `ms` period, `Key.None` is returned.
   ##
   ## If a mouse event was captured, `Key.Mouse` is returned. Call `getMouse()`
-  ## to get tne details about the event.
+  ## to get the details about the event.
   ##
   ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
