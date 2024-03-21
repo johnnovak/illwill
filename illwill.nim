@@ -307,9 +307,6 @@ var gFullRedrawNextFrame = false
 when defined(windows):
   import encodings, winlean
 
-  proc kbhit(): cint {.importc: "_kbhit", header: "<conio.h>".}
-  proc getch(): cint {.importc: "_getch", header: "<conio.h>".}
-
   proc getConsoleMode(hConsoleHandle: Handle, dwMode: ptr DWORD): WINBOOL {.
       stdcall, dynlib: "kernel32", importc: "GetConsoleMode".}
 
@@ -369,14 +366,6 @@ when defined(windows):
     FOCUS_EVENT_RECORD* {.bycopy.} = object
       bSetFocus*: BOOL
 
-    KEY_EVENT_RECORD* {.bycopy.} = object
-      bKeyDown*: BOOL
-      wRepeatCount*: WORD
-      wVirtualKeyCode*: WORD
-      wVirtualScanCode*: WORD
-      uChar*: KEY_EVENT_RECORD_UNION
-      dwControlKeyState*: DWORD
-
     MENU_EVENT_RECORD* {.bycopy.} = object
       dwCommandId*: UINT
 
@@ -421,54 +410,60 @@ when defined(windows):
     if gOldConsoleMode != 0:
       discard setConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), gOldConsoleMode)
 
-
-  func getKeyAsync(): Key =
-    var key = Key.None
-
-    if kbhit() > 0:
-      let c = getch()
-      case c:
-      of   0:
-        case getch():
-        of 59: key = Key.F1
-        of 60: key = Key.F2
-        of 61: key = Key.F3
-        of 62: key = Key.F4
-        of 63: key = Key.F5
-        of 64: key = Key.F6
-        of 65: key = Key.F7
-        of 66: key = Key.F8
-        of 67: key = Key.F9
-        of 68: key = Key.F10
-        else: discard getch()  # ignore unknown 2-key keycodes
-
-      of   8: key = Key.Backspace
-      of   9: key = Key.Tab
-      of  13: key = Key.Enter
-      of  32: key = Key.Space
-
-      of 224:
-        case getch():
-        of  72: key = Key.Up
-        of  75: key = Key.Left
-        of  77: key = Key.Right
-        of  80: key = Key.Down
-
-        of  71: key = Key.Home
-        of  82: key = Key.Insert
-        of  83: key = Key.Delete
-        of  79: key = Key.End
-        of  73: key = Key.PageUp
-        of  81: key = Key.PageDown
-
-        of 133: key = Key.F11
-        of 134: key = Key.F12
-        else: discard  # ignore unknown 2-key keycodes
-
+  proc getchTimeout(ms: int32): KEY_EVENT_RECORD =
+    let fd = getStdHandle(STD_INPUT_HANDLE)
+    var keyEvent = KEY_EVENT_RECORD()
+    var numRead: cint
+    while true:
+      case waitForSingleObject(fd, ms)
+      of WAIT_TIMEOUT:
+        keyEvent.eventType = -1
+        return
+      of WAIT_OBJECT_0:
+        doAssert(readConsoleInput(fd, addr(keyEvent), 1, addr(numRead)) != 0)
+        if numRead == 0 or keyEvent.eventType != 1 or keyEvent.bKeyDown == 0:
+          continue
+        return keyEvent
       else:
-        key = toKey(c)
-    result = key
+        doAssert(false)
 
+  proc getKeyAsync(ms: int): Key =
+    let event = getchTimeout(int32(ms))
+
+    if event.eventType == -1:
+      return Key.None
+
+    if event.uChar != 0:
+      return toKey((event.uChar))
+    else:
+      case event.wVirtualScanCode
+      of  8: return Key.Backspace
+      of  9: return Key.Tab
+      of 13: return Key.Enter
+      of 32: return Key.Space
+      of 59: return Key.F1
+      of 60: return Key.F2
+      of 61: return Key.F3
+      of 62: return Key.F4
+      of 63: return Key.F5
+      of 64: return Key.F6
+      of 65: return Key.F7
+      of 66: return Key.F8
+      of 67: return Key.F9
+      of 68: return Key.F10
+      of 71: return Key.Home
+      of 72: return Key.Up
+      of 73: return Key.PageUp
+      of 75: return Key.Left
+      of 77: return Key.Right
+      of 79: return Key.End
+      of 80: return Key.Down
+      of 81: return Key.PageDown
+      of 82: return Key.Insert
+      of 83: return Key.Delete
+      of 87: return Key.F11
+      of 88: return Key.F12
+      else:  return Key.None
 
   proc writeConsole(hConsoleOutput: HANDLE, lpBuffer: pointer,
                     nNumberOfCharsToWrite: DWORD,
@@ -505,6 +500,10 @@ else:  # OS X & Linux
     DISABLE = "l"
     MouseTrackAny = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{ENABLE}{CSI}?{SET_ANY_EVENT_MOUSE}{ENABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{ENABLE}"
     DisableMouseTrackAny = fmt"{CSI}?{SET_BTN_EVENT_MOUSE}{DISABLE}{CSI}?{SET_ANY_EVENT_MOUSE}{DISABLE}{CSI}?{SET_SGR_EXT_MODE_MOUSE}{DISABLE}"
+    KEYS_D = [Key.Up, Key.Down, Key.Right, Key.Left, Key.None, Key.End, Key.None, Key.Home]
+    KEYS_E = [Key.Delete, Key.End, Key.PageUp, Key.PageDown, Key.Home, Key.End]
+    KEYS_F = [Key.F1, Key.F2, Key.F3, Key.F4, Key.F5, Key.None, Key.F6, Key.F7, Key.F8]
+    KEYS_G = [Key.F9, Key.F10, Key.None, Key.F11, Key.F12]
 
   # Adapted from:
   # https://ftp.gnu.org/old-gnu/Manuals/glibc-2.2.3/html_chapter/libc_24.html#SEC499
@@ -548,10 +547,10 @@ else:  # OS X & Linux
     # set the terminal attributes.
     discard tcSetAttr(STDIN_FILENO, TCSANOW, ttyState.addr)
 
-  proc kbhit(): cint =
+  proc kbhit(ms: int): cint =
     var tv: Timeval
-    tv.tv_sec = Time(0)
-    tv.tv_usec = 0
+    tv.tv_sec = Time(ms div 1000)
+    tv.tv_usec = 1000 * (int32(ms) mod 1000) # int32 because of macos
 
     var fds: TFdSet
     FD_ZERO(fds)
@@ -572,34 +571,6 @@ else:  # OS X & Linux
 
   # global keycode buffer
   var keyBuf {.threadvar.}: array[KeySequenceMaxLen, int]
-
-  const
-    keySequences = {
-      ord(Key.Up):        @["\eOA", "\e[A"],
-      ord(Key.Down):      @["\eOB", "\e[B"],
-      ord(Key.Right):     @["\eOC", "\e[C"],
-      ord(Key.Left):      @["\eOD", "\e[D"],
-
-      ord(Key.Home):      @["\e[1~", "\e[7~", "\eOH", "\e[H"],
-      ord(Key.Insert):    @["\e[2~"],
-      ord(Key.Delete):    @["\e[3~"],
-      ord(Key.End):       @["\e[4~", "\e[8~", "\eOF", "\e[F"],
-      ord(Key.PageUp):    @["\e[5~"],
-      ord(Key.PageDown):  @["\e[6~"],
-
-      ord(Key.F1):        @["\e[11~", "\eOP"],
-      ord(Key.F2):        @["\e[12~", "\eOQ"],
-      ord(Key.F3):        @["\e[13~", "\eOR"],
-      ord(Key.F4):        @["\e[14~", "\eOS"],
-      ord(Key.F5):        @["\e[15~"],
-      ord(Key.F6):        @["\e[17~"],
-      ord(Key.F7):        @["\e[18~"],
-      ord(Key.F8):        @["\e[19~"],
-      ord(Key.F9):        @["\e[20~"],
-      ord(Key.F10):       @["\e[21~"],
-      ord(Key.F11):       @["\e[23~"],
-      ord(Key.F12):       @["\e[24~"],
-    }.toTable
 
   proc splitInputs(inp: openarray[int], max: Natural): seq[seq[int]] =
     ## splits the input buffer to extract mouse coordinates
@@ -658,53 +629,52 @@ else:  # OS X & Linux
     else:
       gMouseInfo.scrollDir = ScrollDirection.sdNone
 
-  proc parseKeys(charsRead: int): seq[Key] =
-    # Inspired by
-    # https://github.com/mcandre/charm/blob/master/lib/charm.c
-    if charsRead == 1:
-      let ch = keyBuf[0]
-      case ch:
-      of   9: result.add(Key.Tab)
-      of  10: result.add(Key.Enter)
-      of  27: result.add(Key.Escape)
-      of  32: result.add(Key.Space)
-      of 127: result.add(Key.Backspace)
-      of 0, 29, 30, 31: discard   # these have no Windows equivalents so
-                                  # we'll ignore them
+  proc parseStdin[T](input: T): Key =
+    var ch1, ch2, ch3, ch4, ch5: char
+    result = Key.None
+    if read(input, ch1.addr, 1) > 0:
+      case ch1
+      of '\e':
+        if read(input, ch2.addr, 1) > 0:
+          if ch2 == 'O' and read(input, ch3.addr, 1) > 0:
+            if ch3 in "ABCDFH":
+              result = KEYS_D[int(ch3) - int('A')]
+            elif ch3 in "PQRS":
+              result = KEYS_F[int(ch3) - int('P')]
+          elif ch2 == '[' and read(input, ch3.addr, 1) > 0:
+            if ch3 in "ABCDFH":
+              result = KEYS_D[int(ch3) - int('A')]
+            elif ch3 in "PQRS":
+              result = KEYS_F[int(ch3) - int('P')]
+            elif ch3 == '1' and read(input, ch4.addr, 1) > 0:
+              if ch4 == '~':
+                result = Key.Home
+              elif ch4 in "12345789" and read(input, ch5.addr, 1) > 0 and ch5 == '~':
+                result = KEYS_F[int(ch4) - int('1')]
+            elif ch3 == '2' and read(input, ch4.addr, 1) > 0:
+              if ch4 == '~':
+                result = Key.Insert
+              elif ch4 in "0134" and read(input, ch5.addr, 1) > 0 and ch5 == '~':
+                result = KEYS_G[int(ch4) - int('0')]
+            elif ch3 in "345678" and read(input, ch4.addr, 1) > 0 and ch4 == '~':
+              result = KEYS_E[int(ch3) - int('3')]
+            else:
+              discard   # if cannot parse full seq it is discarded
+          else:
+            discard     # if cannot parse full seq it is discarded
+        else:
+          result = Key.Escape
+      of '\n':
+        result = Key.Enter
+      of '\b':
+        result = Key.Backspace
       else:
-        result.add(toKey(ch))
+        result = toKey(int(ch1))
 
-    elif charsRead > 3 and keyBuf[0] == 27 and keyBuf[1] == 91 and keyBuf[2] == 60: # TODO what are these :)
-      fillGlobalMouseInfo(keyBuf)
-      result.add(Key.Mouse)
-
-    else:
-      var inputSeq = ""
-      for i in 0..<charsRead:
-        inputSeq &= char(keyBuf[i])
-      var off = 0
-      while off < inputSeq.len:
-        block found:
-          for keyCode, sequences in keySequences.pairs:
-            for s in sequences:
-              if off + s.len <= inputSeq.len and s == inputSeq[off..off+s.high]:
-                result.add(toKey(keyCode))
-                off += s.len
-                break found
-          if off < inputSeq.len:
-            result.add(toKey(int(inputSeq[off])))
-            off += 1
-
-  proc getKeysAsync(): seq[Key] =
-    var i = 0
-    while kbhit() > 0 and i < KeySequenceMaxLen:
-      var ret = read(0, keyBuf[i].addr, 1)
-      if ret > 0:
-        i += 1
-      else:
-        break
-    if i > 0:
-      result = parseKeys(i)
+  proc getKeyAsync(ms: int): Key =
+    result = Key.None
+    if kbhit(ms) > 0:
+      result = parseStdin(cint(STDIN_FILENO))
 
   template put(s: string) = stdout.write s
 
@@ -891,29 +861,26 @@ proc getKey*(): Key =
   ##
   ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
-  let keys = getKeysAsync()
-  if keys.len == 0:
-    return Key.None
+  result = getKeyAsync(0)
   when defined(windows):
     if result == Key.None:
       if hasMouseInput():
         return Key.Mouse
 
-proc getKeys*(): seq[Key] =
-  ## Reads the next keystrokes in a non-blocking manner. If there are no
-  ## keypress events in the buffer, empty seq is returned.
+proc getKeyWithTimeout*(ms = 1000): Key =
+  ## Reads the next keystroke within specific timeout (default = 1s). If there are no
+  ## keypress events happen in the `ms` period, `Key.None` is returned.
   ##
   ## If a mouse event was captured, `Key.Mouse` is returned. Call `getMouse()`
   ## to get tne details about the event.
   ##
   ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
-  result = getKeysAsync()
+  result = getKeyAsync(ms)
   when defined(windows):
-    if result.len == 0:
+    if result == Key.None:
       if hasMouseInput():
-        result.add(Key.Mouse)
-
+        return Key.Mouse
 
 type
   TerminalChar* = object
