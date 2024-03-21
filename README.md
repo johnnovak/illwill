@@ -82,6 +82,11 @@ The best way to install the library is by using
 nimble install illwill
 ```
 
+## Documentation
+
+https://www.johnnovak.net/illwill/
+
+
 ## Usage
 
 This is a simple example on the general structure of a fullscreen terminal
