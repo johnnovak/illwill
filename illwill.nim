@@ -288,17 +288,7 @@ proc getMouse*(): MouseInfo =
 
   return gMouseInfo
 
-
-{.push warning[HoleEnumConv]:off.}
-
-func toKey(c: int): Key =
-  try:
-    result = Key(c)
-  except RangeDefect:  # ignore unknown keycodes
-    result = Key.None
-
-{.pop}
-
+func toKey(c: cint): Key = cast[Key](c)
 
 var gIllwillInitialised = false
 var gFullScreen = false
