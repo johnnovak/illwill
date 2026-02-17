@@ -322,6 +322,7 @@ when defined(windows):
     ENABLE_WINDOW_INPUT = 0x8
     ENABLE_QUICK_EDIT_MODE = 0x40
     ENABLE_EXTENDED_FLAGS = 0x80
+    KEY_EVENT   = 0x0001
     MOUSE_EVENT = 0x0002
 
   const
@@ -350,6 +351,14 @@ when defined(windows):
     KEY_EVENT_RECORD_UNION* {.bycopy, union.} = object
       UnicodeChar*: WCHAR
       AsciiChar*: CHAR
+
+    KEY_EVENT_RECORD* {.bycopy.} = object
+      bKeyDown*: BOOL
+      wRepeatCount*: WORD
+      wVirtualKeyCode*: WORD
+      wVirtualScanCode*: WORD
+      uChar*: KEY_EVENT_RECORD_UNION
+      dwControlKeyState*: DWORD
 
     INPUT_RECORD_UNION* {.bycopy, union.} = object
       KeyEvent*: KEY_EVENT_RECORD
@@ -410,33 +419,92 @@ when defined(windows):
     if gOldConsoleMode != 0:
       discard setConsoleMode(getStdHandle(STD_OUTPUT_HANDLE), gOldConsoleMode)
 
-  proc getchTimeout(ms: int32): KEY_EVENT_RECORD =
+  template alias(newName: untyped, call: untyped) =
+    template newName(): untyped = call
+
+  var gLastMouseInfo = MouseInfo()
+
+  proc fillGlobalMouseInfo(inputRecord: INPUT_RECORD) =
+    alias(me, inputRecord.Event.MouseEvent)
+
+    gMouseInfo.x = me.dwMousePosition.X
+    gMouseInfo.y = me.dwMousePosition.Y
+
+    case me.dwButtonState
+    of FROM_LEFT_1ST_BUTTON_PRESSED: gMouseInfo.button = mbLeft
+    of FROM_LEFT_2ND_BUTTON_PRESSED: gMouseInfo.button = mbMiddle
+    of RIGHTMOST_BUTTON_PRESSED:     gMouseInfo.button = mbRight
+    else:                            gMouseInfo.button = mbNone
+
+    if gMouseInfo.button != mbNone:
+      gMouseInfo.action = MouseButtonAction.mbaPressed
+    elif gMouseInfo.button == mbNone and gLastMouseInfo.button != mbNone:
+      gMouseInfo.action = MouseButtonAction.mbaReleased
+    else:
+      gMouseInfo.action = MouseButtonAction.mbaNone
+
+    if gLastMouseInfo.x != gMouseInfo.x or gLastMouseInfo.y != gMouseInfo.y:
+      gMouseInfo.move = true
+    else:
+      gMouseInfo.move = false
+
+    if bitand(me.dwEventFlags, MOUSE_WHEELED) == MOUSE_WHEELED:
+      gMouseInfo.scroll = true
+      if me.dwButtonState.testBit(31):
+        gMouseInfo.scrollDir = ScrollDirection.sdDown
+      else:
+        gMouseInfo.scrollDir = ScrollDirection.sdUp
+    else:
+      gMouseInfo.scroll = false
+      gMouseInfo.scrollDir = ScrollDirection.sdNone
+
+    gMouseInfo.ctrl = (
+        bitand(me.dwControlKeyState, LEFT_CTRL_PRESSED) == LEFT_CTRL_PRESSED or
+        bitand(me.dwControlKeyState, RIGHT_CTRL_PRESSED) == RIGHT_CTRL_PRESSED
+    )
+
+    gMouseInfo.shift = bitand(me.dwControlKeyState, SHIFT_PRESSED) == SHIFT_PRESSED
+
+    gLastMouseInfo = gMouseInfo
+
+  proc getEventTimeout(ms: int32): INPUT_RECORD =
     let fd = getStdHandle(STD_INPUT_HANDLE)
-    var keyEvent = KEY_EVENT_RECORD()
+    var inputRecord = INPUT_RECORD()
     var numRead: cint
     while true:
       case waitForSingleObject(fd, ms)
       of WAIT_TIMEOUT:
-        keyEvent.eventType = -1
+        result.EventType = WORD.high
         return
       of WAIT_OBJECT_0:
-        doAssert(readConsoleInput(fd, addr(keyEvent), 1, addr(numRead)) != 0)
-        if numRead == 0 or keyEvent.eventType != 1 or keyEvent.bKeyDown == 0:
+        doAssert(readConsoleInput(fd, addr(inputRecord), 1, addr(numRead)) != 0)
+        if numRead == 0:
           continue
-        return keyEvent
+
+        if inputRecord.EventType == KEY_EVENT or inputRecord.EventType == MOUSE_EVENT:
+          return inputRecord
+
       else:
         doAssert(false)
 
   proc getKeyAsync(ms: int): Key =
-    let event = getchTimeout(int32(ms))
+    let event = getEventTimeout(int32(ms))
 
-    if event.eventType == -1:
+    if event.EventType == WORD.high:
+      return Key.None
+    elif event.EventType == MOUSE_EVENT and gMouse:
+      fillGlobalMouseInfo(event)
+      return Key.Mouse
+
+    # if is not WORD.high or mouse event, it must be a key event
+    let keyEvent = event.Event.KeyEvent
+    if keyEvent.bKeyDown == 0:
       return Key.None
 
-    if event.uChar != 0:
-      return toKey((event.uChar))
+    if keyEvent.uChar.UnicodeChar.ord != 0:
+      return toKey(keyEvent.uChar.UnicodeChar.ord)
     else:
-      case event.wVirtualScanCode
+      case keyEvent.wVirtualScanCode
       of  8: return Key.Backspace
       of  9: return Key.Tab
       of 13: return Key.Enter
@@ -570,37 +638,37 @@ else:  # OS X & Linux
   const KeySequenceMaxLen = 100
 
   # global keycode buffer
-  var keyBuf {.threadvar.}: array[KeySequenceMaxLen, int]
+  var keyBuf {.threadvar.}: array[KeySequenceMaxLen, char]
 
-  proc splitInputs(inp: openarray[int], max: Natural): seq[seq[int]] =
+  proc splitInputs(inp: openarray[char], max: Natural): seq[seq[char]] =
     ## splits the input buffer to extract mouse coordinates
-    var parts: seq[seq[int]] = @[]
-    var cur: seq[int] = @[]
+    var parts: seq[seq[char]] = @[]
+    var cur: seq[char] = @[]
     for ch in inp[CSI.len+1 .. max-1]:
-      if ch == ord('M'):
+      if ch == 'M':
         # Button press
         parts.add(cur)
         gMouseInfo.action = mbaPressed
         break
-      elif ch == ord('m'):
+      elif ch == 'm':
         # Button release
         parts.add(cur)
         gMouseInfo.action = mbaReleased
         break
-      elif ch != ord(';'):
+      elif ch != ';':
         cur.add(ch)
       else:
         parts.add(cur)
         cur = @[]
     return parts
 
-  proc getPos(inp: seq[int]): int =
+  proc getPos(inp: seq[char]): int =
     var str = ""
     for ch in inp:
-      str &= $(ch.chr)
+      str &= $ch
     result = parseInt(str)
 
-  proc fillGlobalMouseInfo(keyBuf: array[KeySequenceMaxLen, int]) =
+  proc fillGlobalMouseInfo(keyBuf: openArray[char]) =
     let parts = splitInputs(keyBuf, keyBuf.len)
     gMouseInfo.x = parts[1].getPos() - 1
     gMouseInfo.y = parts[2].getPos() - 1
@@ -630,34 +698,41 @@ else:  # OS X & Linux
       gMouseInfo.scrollDir = ScrollDirection.sdNone
 
   proc parseStdin[T](input: T): Key =
-    var ch1, ch2, ch3, ch4, ch5: char
     result = Key.None
-    if read(input, ch1.addr, 1) > 0:
-      case ch1
+    if read(input, keyBuf[0].addr, 1) > 0:
+      case keyBuf[0]
       of '\e':
-        if read(input, ch2.addr, 1) > 0:
-          if ch2 == 'O' and read(input, ch3.addr, 1) > 0:
-            if ch3 in "ABCDFH":
-              result = KEYS_D[int(ch3) - int('A')]
-            elif ch3 in "PQRS":
-              result = KEYS_F[int(ch3) - int('P')]
-          elif ch2 == '[' and read(input, ch3.addr, 1) > 0:
-            if ch3 in "ABCDFH":
-              result = KEYS_D[int(ch3) - int('A')]
-            elif ch3 in "PQRS":
-              result = KEYS_F[int(ch3) - int('P')]
-            elif ch3 == '1' and read(input, ch4.addr, 1) > 0:
-              if ch4 == '~':
+        if read(input, keyBuf[1].addr, 1) > 0:
+          if keyBuf[1] == 'O' and read(input, keyBuf[2].addr, 1) > 0:
+            if keyBuf[2] in "ABCDFH":
+              result = KEYS_D[int(keyBuf[2]) - int('A')]
+            elif keyBuf[2] in "PQRS":
+              result = KEYS_F[int(keyBuf[2]) - int('P')]
+          elif keyBuf[1] == '[' and read(input, keyBuf[2].addr, 1) > 0:
+            if keyBuf[2] == '<':
+              for i in 3 .. KeySequenceMaxLen - 1:
+                if read(input, keyBuf[i].addr, 1) <= 0:
+                  break
+                if keyBuf[i] == 'M' or keyBuf[i] == 'm':
+                  fillGlobalMouseInfo(keyBuf[0 .. i])
+                  result = Key.Mouse
+                  break
+            elif keyBuf[2] in "ABCDFH":
+              result = KEYS_D[int(keyBuf[2]) - int('A')]
+            elif keyBuf[2] in "PQRS":
+              result = KEYS_F[int(keyBuf[2]) - int('P')]
+            elif keyBuf[2] == '1' and read(input, keyBuf[3].addr, 1) > 0:
+              if keyBuf[3] == '~':
                 result = Key.Home
-              elif ch4 in "12345789" and read(input, ch5.addr, 1) > 0 and ch5 == '~':
-                result = KEYS_F[int(ch4) - int('1')]
-            elif ch3 == '2' and read(input, ch4.addr, 1) > 0:
-              if ch4 == '~':
+              elif keyBuf[3] in "12345789" and read(input, keyBuf[4].addr, 1) > 0 and keyBuf[4] == '~':
+                result = KEYS_F[int(keyBuf[3]) - int('1')]
+            elif keyBuf[2] == '2' and read(input, keyBuf[3].addr, 1) > 0:
+              if keyBuf[3] == '~':
                 result = Key.Insert
-              elif ch4 in "0134" and read(input, ch5.addr, 1) > 0 and ch5 == '~':
-                result = KEYS_G[int(ch4) - int('0')]
-            elif ch3 in "345678" and read(input, ch4.addr, 1) > 0 and ch4 == '~':
-              result = KEYS_E[int(ch3) - int('3')]
+              elif keyBuf[3] in "0134" and read(input, keyBuf[4].addr, 1) > 0 and keyBuf[4] == '~':
+                result = KEYS_G[int(keyBuf[3]) - int('0')]
+            elif keyBuf[2] in "345678" and read(input, keyBuf[3].addr, 1) > 0 and keyBuf[3] == '~':
+              result = KEYS_E[int(keyBuf[2]) - int('3')]
             else:
               discard   # if cannot parse full seq it is discarded
           else:
@@ -669,7 +744,7 @@ else:  # OS X & Linux
       of '\b':
         result = Key.Backspace
       else:
-        result = toKey(int(ch1))
+        result = toKey(int(keyBuf[0]))
 
   proc getKeyAsync(ms: int): Key =
     result = Key.None
@@ -775,83 +850,6 @@ proc illwillDeinit*() =
   resetAttributes()
   showCursor()
 
-when defined(windows):
-
-  template alias(newName: untyped, call: untyped) =
-    template newName(): untyped = call
-
-  var gLastMouseInfo = MouseInfo()
-
-  proc fillGlobalMouseInfo(inputRecord: INPUT_RECORD) =
-    alias(me, inputRecord.Event.MouseEvent)
-
-    gMouseInfo.x = me.dwMousePosition.X
-    gMouseInfo.y = me.dwMousePosition.Y
-
-    case me.dwButtonState
-    of FROM_LEFT_1ST_BUTTON_PRESSED: gMouseInfo.button = mbLeft
-    of FROM_LEFT_2ND_BUTTON_PRESSED: gMouseInfo.button = mbMiddle
-    of RIGHTMOST_BUTTON_PRESSED:     gMouseInfo.button = mbRight
-    else:                            gMouseInfo.button = mbNone
-
-    if gMouseInfo.button != mbNone:
-      gMouseInfo.action = MouseButtonAction.mbaPressed
-    elif gMouseInfo.button == mbNone and gLastMouseInfo.button != mbNone:
-      gMouseInfo.action = MouseButtonAction.mbaReleased
-    else:
-      gMouseInfo.action = MouseButtonAction.mbaNone
-
-    if gLastMouseInfo.x != gMouseInfo.x or gLastMouseInfo.y != gMouseInfo.y:
-      gMouseInfo.move = true
-    else:
-      gMouseInfo.move = false
-
-    if bitand(me.dwEventFlags, MOUSE_WHEELED) == MOUSE_WHEELED:
-      gMouseInfo.scroll = true
-      if me.dwButtonState.testBit(31):
-        gMouseInfo.scrollDir = ScrollDirection.sdDown
-      else:
-        gMouseInfo.scrollDir = ScrollDirection.sdUp
-    else:
-      gMouseInfo.scroll = false
-      gMouseInfo.scrollDir = ScrollDirection.sdNone
-
-    gMouseInfo.ctrl = (
-        bitand(me.dwControlKeyState, LEFT_CTRL_PRESSED) == LEFT_CTRL_PRESSED or
-        bitand(me.dwControlKeyState, RIGHT_CTRL_PRESSED) == RIGHT_CTRL_PRESSED
-    )
-
-    gMouseInfo.shift = bitand(me.dwControlKeyState, SHIFT_PRESSED) == SHIFT_PRESSED
-
-    gLastMouseInfo = gMouseInfo
-
-
-  proc hasMouseInput(): bool =
-    var buffer: array[INPUT_BUFFER_LEN, INPUT_RECORD]
-    var numberOfEventsRead: DWORD
-    var toRead: int = 0
-
-    discard peekConsoleInputA(getStdHandle(STD_INPUT_HANDLE), buffer.addr,
-                              buffer.len.DWORD, numberOfEventsRead.addr)
-
-    if numberOfEventsRead == 0: return false
-
-    for inputRecord in buffer[0..<numberOfEventsRead.int]:
-      toRead.inc()
-      if inputRecord.EventType == MOUSE_EVENT:
-        break
-
-    if toRead == 0: return false
-
-    discard readConsoleInput(getStdHandle(STD_INPUT_HANDLE), buffer.addr,
-                             toRead.DWORD, numberOfEventsRead.addr)
-
-    if buffer[numberOfEventsRead - 1].EventType == MOUSE_EVENT:
-      fillGlobalMouseInfo(buffer[numberOfEventsRead - 1])
-      return true
-    else:
-      return false
-
 proc getKey*(): Key =
   ## Reads the next keystroke in a non-blocking manner. If there are no
   ## keypress events in the buffer, `Key.None` is returned.
@@ -862,10 +860,6 @@ proc getKey*(): Key =
   ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
   result = getKeyAsync(0)
-  when defined(windows):
-    if result == Key.None:
-      if hasMouseInput():
-        return Key.Mouse
 
 proc getKeyWithTimeout*(ms = 1000): Key =
   ## Reads the next keystroke with a timeout. If there were no keypress events
@@ -877,10 +871,6 @@ proc getKeyWithTimeout*(ms = 1000): Key =
   ## If the module is not intialised, `IllwillError` is raised.
   checkInit()
   result = getKeyAsync(ms)
-  when defined(windows):
-    if result == Key.None:
-      if hasMouseInput():
-        return Key.Mouse
 
 type
   TerminalChar* = object
@@ -1656,4 +1646,3 @@ proc drawRect*(tb: var TerminalBuffer, x1, y1, x2, y2: Natural,
   var bb = newBoxBuffer(tb.width, tb.height)
   bb.drawRect(x1, y1, x2, y2, doubleStyle)
   tb.write(bb)
-
