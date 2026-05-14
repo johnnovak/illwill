@@ -1102,10 +1102,10 @@ func getStyle*(tb: var TerminalBuffer): set[Style] =
   result = tb.currStyle
 
 proc resetAttributes*(tb: var TerminalBuffer) =
-  ## Resets the current text attributes to `bgNone`, `fgWhite` and clears
+  ## Resets the current text attributes to `bgNone`, `fgNone` and clears
   ## all style flags.
   tb.setBackgroundColor(bgNone)
-  tb.setForegroundColor(fgWhite)
+  tb.setForegroundColor(fgNone)
   tb.setStyle({})
 
 proc write*(tb: var TerminalBuffer, x, y: Natural, s: string) =
